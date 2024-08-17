@@ -1,5 +1,10 @@
+import logging
+import time
 import torch
 from transformers import AutoTokenizer, LlamaForCausalLM
+
+logging.basicConfig(level=logging.INFO, force=True)
+logger = logging.getLogger(__name__)
 
 # Load the tokenizer and model
 model_path = "nvidia/Llama-3.1-Minitron-4B-Width-Base"
@@ -15,8 +20,17 @@ prompt = "The Open-Closed Principle is"
 inputs = tokenizer.encode(prompt, return_tensors='pt').to(model.device)
 
 # Generate the output
+before_ts_ms = int(time.time() * 1000)
 outputs = model.generate(inputs, max_length=500)
+after_ts_ms = int(time.time() * 1000)
 
 # Decode and print the output
 output_text = tokenizer.decode(outputs[0])
 print(output_text)
+
+execution_time_ms = after_ts_ms - before_ts_ms
+num_generated_tokens = outputs.shape[1]
+average_time_per_token_ms = execution_time_ms / num_generated_tokens
+
+logger.info(f"execution_time={execution_time_ms} ms")
+logger.info(f"average_time_per_token={average_time_per_token_ms:.2f} ms")
