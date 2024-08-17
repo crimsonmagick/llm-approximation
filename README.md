@@ -1,1 +1,1 @@
-Playground project for learning the Hugginface Transformers library. See https://huggingface.co/learn/nlp-course/chapter1/1
+It's a minitron I guess
