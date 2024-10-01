@@ -8,7 +8,8 @@ class LargeLanguageModel:
         logging.basicConfig(level=logging.INFO, force=True)
         self.logger = logging.getLogger(__name__)
         self.model_path = model_path
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.device = device
@@ -18,9 +19,6 @@ class LargeLanguageModel:
     def tokenize(self, prompt):
         return self.tokenizer(prompt, return_tensors='pt',
                               max_length=512).to(self.model.device)
-    
-    def tokenizer(self):
-        return self.tokenizer
     
     def evaluate(self, tokens, max_length=500):
         attention_mask = tokens["attention_mask"]
