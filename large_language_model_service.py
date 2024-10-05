@@ -5,7 +5,9 @@ from llm_type import LLMType
 
 
 def get_model(llm_type: LLMType, path: string) -> LargeLanguageModel:
-    if llm_type == LLMType.LLAMA_2 or llm_type == LLMType.LLAMA_3:
-        return LlamaLargeLanguageModel(llm_type, path, device='cuda')
+    if llm_type == LLMType.LLAMA_2:
+        return LlamaLargeLanguageModel(llm_type, path, False, device='cuda')
+    elif llm_type == LLMType.LLAMA_3:
+        return LlamaLargeLanguageModel(llm_type, path, True, device='cuda')
     else:
         raise ValueError(f'Model type not supported, llm_type: {llm_type}')

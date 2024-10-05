@@ -48,10 +48,9 @@ class MissingParameterException(Exception):
 
 
 class LlamaLargeLanguageModel(LargeLanguageModel):
-    def __init__(self, llm_type: LLMType, model_path: string, device: string = "cuda"):
+    def __init__(self, llm_type: LLMType, model_path: string, use_fast=True, device: string = "cuda"):
         self.model_path = model_path
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-        # self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=use_fast)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.device = device
