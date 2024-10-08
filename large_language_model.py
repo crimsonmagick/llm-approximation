@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import torch
 
 from llm_type import LLMType
+from metrics import capture_evaluation
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 
@@ -62,12 +63,49 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
         return self.tokenizer(prompt, return_tensors='pt',
                               max_length=512).to(self.model.device)
     
+    @capture_evaluation
     def evaluate(self, tokens, max_length=500):
         attention_mask = tokens["attention_mask"]
         input_ids = tokens["input_ids"]
         evaluation = self.model.generate(input_ids, attention_mask=attention_mask, max_length=max_length,
                                          pad_token_id=self.tokenizer.eos_token_id)
-        return evaluation
+        return evaluation[0], evaluation.shape[1]
     
     def detokenize(self, tokens):
         return self.tokenizer.decode(tokens)
+
+
+class PrunedLargeLanguageModel(LargeLanguageModel):
+    def __init__(self, llm_type: LLMType, model_path: string, device: string = "cuda"):
+        self.model_path = model_path
+        self.device = device
+        checkpoint = torch.load(model_path)
+        self.model = checkpoint["model"].to(self.device)
+        self.model.eval()
+        self.tokenizer = checkpoint["tokenizer"]
+        super().__init__(llm_type, model_path, device)
+    
+    def tokenize(self, prompt):
+        tokens = self.tokenizer(prompt, return_tensors='pt', )
+        tokens["input_ids"] = tokens["input_ids"].to(self.model.device)
+        tokens["attention_mask"] = tokens["attention_mask"].to(self.model.device)
+        return tokens
+    
+    @capture_evaluation
+    def evaluate(self, tokens, max_length=500):
+        input_ids = tokens['input_ids']
+        attention_mask = tokens['attention_mask']
+        with torch.no_grad():
+            evaluation = self.model.generate(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    do_sample=True,
+                    top_k=50,
+                    max_length=max_length,
+                    top_p=0.95,
+                    temperature=1.0,
+                )
+        return evaluation[0], evaluation.shape[1]
+    
+    def detokenize(self, tokens):
+        return self.tokenizer.decode(tokens.data, skip_special_tokens=True)
