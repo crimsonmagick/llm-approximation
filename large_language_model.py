@@ -3,9 +3,11 @@ import string
 from abc import ABC, abstractmethod
 
 import torch
+import torch.nn.functional as functional
+from triton.language.semantic import reduction
 
 from llm_type import LLMType
-from metrics import capture_evaluation
+from metrics import capture_evaluation, capture_loss
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 
@@ -31,7 +33,7 @@ class LargeLanguageModel(ABC):
         pass
     
     @abstractmethod
-    def loss(self, tokens):
+    def per_token_losses(self, tokens):
         pass
     
     def get_allocated_memory(self):
@@ -87,16 +89,21 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
             )
         return evaluation[0], evaluation.shape[1]
     
-    def loss(self, tokens):
+    @capture_loss
+    def per_token_losses(self, tokens):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
-        labels = input_ids.clone()
-        labels = labels[:, 1:].contiguous()
-        input_ids = input_ids[:, :-1].contiguous()
-        attention_mask=attention_mask[:, :-1].contiguous()
         with torch.no_grad():
-            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        return outputs.loss
+            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+        labels = input_ids.clone() # labels are derived from input
+        labels = labels[:, 1:].contiguous() # Drop the first label - it isn't useful as no logits are generated for it
+        labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length], in preperation for cross_entroy calculation
+        logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
+        logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size * sequence_length, vocab_size]
+        per_token_loss = functional.cross_entropy(logits, labels, reduction='none') # vector of per token losses
+        attention_mask_vector = attention_mask[:, :-1].view(-1).contiguous()
+        return per_token_loss * attention_mask_vector
 
 
 class PrunedLargeLanguageModel(LargeLanguageModel):
@@ -108,6 +115,10 @@ class PrunedLargeLanguageModel(LargeLanguageModel):
         self.model.eval()
         self.tokenizer = checkpoint["tokenizer"]
         super().__init__(llm_type, model_path, device)
+    
+    def detokenize(self, tokens):
+        return self.tokenizer.decode(tokens.data, skip_special_tokens=True)
+    
     
     def tokenize(self, prompt):
         tokens = self.tokenizer(prompt, return_tensors='pt', )
@@ -132,6 +143,17 @@ class PrunedLargeLanguageModel(LargeLanguageModel):
                 temperature=1.0,
             )
         return evaluation[0], evaluation.shape[1]
-    
-    def detokenize(self, tokens):
-        return self.tokenizer.decode(tokens.data, skip_special_tokens=True)
+        
+    @capture_loss
+    def per_token_losses(self, tokens):
+        input_ids = tokens['input_ids']
+        attention_mask = tokens['attention_mask']
+        with torch.no_grad():
+            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+        labels = input_ids.clone() # labels are derived from input
+        labels = labels[:, 1:].contiguous() # Drop the first label - it isn't useful as no logits are generated for it
+        labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length], in preperation for cross_entroy calculation
+        logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
+        logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size * sequence_length, vocab_size]
+        return functional.cross_entropy(logits, labels, reduction='none') # vector of per token losses

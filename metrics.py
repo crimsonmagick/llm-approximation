@@ -75,3 +75,23 @@ def capture_evaluation(func):
     
     capture = CaptureEvaluation(func)
     return lambda *args, **kwargs: capture.capture(*args, **kwargs)
+
+def capture_loss(func):
+    class CaptureLoss:
+        def __init__(self, func):
+            self.token_count = 0
+            self.aggregate_loss = 0
+            self.func = func
+    
+        def capture(self, *args, **kwargs):
+            token_sequences: tensor = args[1]['input_ids']
+            for sequence in token_sequences:
+                self.token_count += len(sequence) - 1 # can't count first token, is not generated as a part of evaluation
+            token_losses = self.func(*args, **kwargs)
+            self.aggregate_loss += token_losses.sum()
+            perplexity = self.aggregate_loss / self.token_count
+            print(f'Perplexity: {perplexity}')
+            return token_losses
+
+    capture = CaptureLoss(func)
+    return lambda *args, **kwargs: capture.capture(*args, **kwargs)

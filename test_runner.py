@@ -29,9 +29,10 @@ class TestRunner:
             text = example["text"]
             tokens = self.llm.tokenize(text)
             evaluation = self.llm.evaluate(tokens)
-            generated_tokens = evaluation[0]
-            detokenized = self.llm.detokenize(generated_tokens)
-            logger.info(f"Prompt: {text}, generated: {detokenized}")
+            self.llm.per_token_losses(tokens)
+            # generated_tokens = evaluation[0]
+            # detokenized = self.llm.detokenize(generated_tokens)
+            # logger.info(f"Prompt: {text}, generated: {detokenized}")
 
 
 def main():
