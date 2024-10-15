@@ -19,6 +19,10 @@ class LargeLanguageModel(ABC):
         self.device = device
     
     @abstractmethod
+    def detokenize(self, tokens):
+        pass
+    
+    @abstractmethod
     def tokenize(self, prompt):
         pass
     
@@ -27,7 +31,7 @@ class LargeLanguageModel(ABC):
         pass
     
     @abstractmethod
-    def detokenize(self, tokens):
+    def loss(self, tokens):
         pass
     
     def get_allocated_memory(self):
@@ -57,7 +61,11 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
         self.device = device
         self.dtype = torch.bfloat16
         self.model = LlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
+        self.model.eval()
         super(LlamaLargeLanguageModel, self).__init__(llm_type, model_path, device)
+    
+    def detokenize(self, tokens):
+        return self.tokenizer.decode(tokens)
     
     def tokenize(self, prompt):
         return self.tokenizer(prompt, return_tensors='pt',
@@ -65,14 +73,30 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
     
     @capture_evaluation
     def evaluate(self, tokens, max_length=500):
-        attention_mask = tokens["attention_mask"]
-        input_ids = tokens["input_ids"]
-        evaluation = self.model.generate(input_ids, attention_mask=attention_mask, max_length=max_length,
-                                         pad_token_id=self.tokenizer.eos_token_id)
+        input_ids = tokens['input_ids']
+        attention_mask = tokens['attention_mask']
+        with torch.no_grad():
+            evaluation = self.model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                do_sample=True,
+                top_k=50,
+                max_length=max_length,
+                top_p=0.95,
+                temperature=1.0,
+            )
         return evaluation[0], evaluation.shape[1]
     
-    def detokenize(self, tokens):
-        return self.tokenizer.decode(tokens)
+    def loss(self, tokens):
+        input_ids = tokens['input_ids']
+        attention_mask = tokens['attention_mask']
+        labels = input_ids.clone()
+        labels = labels[:, 1:].contiguous()
+        input_ids = input_ids[:, :-1].contiguous()
+        attention_mask=attention_mask[:, :-1].contiguous()
+        with torch.no_grad():
+            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+        return outputs.loss
 
 
 class PrunedLargeLanguageModel(LargeLanguageModel):
@@ -95,16 +119,18 @@ class PrunedLargeLanguageModel(LargeLanguageModel):
     def evaluate(self, tokens, max_length=500):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
+        labels = input_ids.clone()
+        
         with torch.no_grad():
             evaluation = self.model.generate(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    do_sample=True,
-                    top_k=50,
-                    max_length=max_length,
-                    top_p=0.95,
-                    temperature=1.0,
-                )
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                do_sample=True,
+                top_k=50,
+                max_length=max_length,
+                top_p=0.95,
+                temperature=1.0,
+            )
         return evaluation[0], evaluation.shape[1]
     
     def detokenize(self, tokens):
