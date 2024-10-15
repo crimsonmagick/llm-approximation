@@ -33,16 +33,17 @@ class TestRunner:
             # generated_tokens = evaluation[0]
             # detokenized = self.llm.detokenize(generated_tokens)
             # logger.info(f"Prompt: {text}, generated: {detokenized}")
+        logger.info(f'Vocab Size: {self.llm.vocab_size()}')
 
 
 def main():
-    # runner = TestRunner(LLMType.LLAMA_2, '/home/welb/ai/models/decapoda-research-llama-7B-hf',
-    #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
-    runner = TestRunner(LLMType.LLAMA_3, "nvidia/Llama-3.1-Minitron-4B-Width-Base", ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner = TestRunner(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B',
     #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
-    # runner = TestRunner(LLMType.PRUNED, '/home/welb/workspace/LLM-Pruner/prune_log/llama_prune/pytorch_model.bin',
+    # runner = TestRunner(LLMType.LLAMA_3, "nvidia/Llama-3.1-Minitron-4B-Width-Base", ("Salesforce/wikitext", 'wikitext-2-v1'))
+    # runner = TestRunner(LLMType.LLAMA_2, '/home/welb/ai/models/decapoda-research-llama-7B-hf',
     #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
+    runner = TestRunner(LLMType.PRUNED, '/home/welb/workspace/LLM-Pruner/prune_log/llama_prune/pytorch_model.bin',
+                        ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(20)
 
 

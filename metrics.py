@@ -90,7 +90,7 @@ def capture_loss(func):
             token_losses = self.func(*args, **kwargs)
             self.aggregate_loss += token_losses.sum()
             perplexity = self.aggregate_loss / self.token_count
-            print(f'Perplexity: {perplexity}')
+            logger.info(f'Perplexity: {perplexity}')
             return token_losses
 
     capture = CaptureLoss(func)
