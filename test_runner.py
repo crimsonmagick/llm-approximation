@@ -15,17 +15,16 @@ class TestRunner:
     
     def __init__(self, llm_type, model_path, dataset_path: tuple):
         self.llm = get_model(llm_type, model_path)
-        self.dataset = load_dataset(*dataset_path)
+        self.test_data = load_dataset(*dataset_path)["test"].filter(
+            lambda ex: ex["text"] and ex["text"].strip() != ""
+        )
     
     def __log_memory(self, prexfix):
         logger.info(f"{prexfix} Allocated Memory: {self.llm.get_allocated_memory() / 1024 ** 2:.2f} MB")
         logger.info(f"{prexfix} Reserved Memory: {self.llm.get_reserved_memory() / 1024 ** 2:.2f} MB")
     
     def batch_evaluate(self, rows_to_evaluate):
-        filtered = self.dataset["test"].filter(
-            lambda ex: ex["text"] and ex["text"].strip() != ""
-        )
-        for example in filtered.select(range(rows_to_evaluate)):
+        for example in self.test_data.select(range(rows_to_evaluate)):
             text = example["text"]
             tokens = self.llm.tokenize(text)
             evaluation = self.llm.evaluate(tokens)
@@ -37,13 +36,15 @@ class TestRunner:
 
 
 def main():
-    # runner = TestRunner(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B',
-    #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
+    runner = TestRunner(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B',
+                        ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner = TestRunner(LLMType.LLAMA_3, "nvidia/Llama-3.1-Minitron-4B-Width-Base", ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner = TestRunner(LLMType.LLAMA_2, '/home/welb/ai/models/decapoda-research-llama-7B-hf',
     #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
-    runner = TestRunner(LLMType.PRUNED, '/home/welb/workspace/LLM-Pruner/prune_log/llama_prune/pytorch_model.bin',
-                        ("Salesforce/wikitext", 'wikitext-2-v1'))
+    # runner = TestRunner(LLMType.PRUNED, '/home/welb/workspace/LLM-Pruner/prune_log/llama_prune/pytorch_model.bin',
+    #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
+    # runner =  TestRunner(LLMType.PRUNED, 'google-bert/bert-base-uncased',
+    #                                          ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(20)
 
 

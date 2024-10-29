@@ -4,6 +4,12 @@ from large_language_model import LargeLanguageModel, LlamaLargeLanguageModel, Pr
 from llm_type import LLMType
 
 
+class LlmMetricsFacade:
+    def __init__(self, source_llm):
+        self.source_llm = source_llm
+        
+
+
 def get_model(llm_type: LLMType, path: string) -> LargeLanguageModel:
     if llm_type == LLMType.LLAMA_2:
         return LlamaLargeLanguageModel(llm_type, path, False, device='cuda')
