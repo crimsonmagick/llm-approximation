@@ -1,21 +1,32 @@
 from triton.language import bfloat16
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaForCausalLM
+from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
-import copy
 
 
 def prune_attention_heads(model, heads_to_prune):
+    # Calculate new embedding dimension based on pruned heads
+    original_embedding_dim = model.model.embed_tokens.embedding_dim
+    num_heads = model.model.layers[0].self_attn.num_heads
+    head_size = original_embedding_dim // num_heads
+    
+    # Determine which heads to keep
+    all_heads = set(range(num_heads))
+    keep_heads = sorted(all_heads - set([head for layer_heads in heads_to_prune.values() for head in layer_heads]))
+    
+    # Calculate new embedding dimension
+    new_embedding_dim = len(keep_heads) * head_size
+    
+    # Adjust the embedding layer
+    embed_weights = model.model.embed_tokens.weight[:, :new_embedding_dim]
+    model.model.embed_tokens = torch.nn.Embedding(model.model.embed_tokens.num_embeddings, new_embedding_dim)
+    model.model.embed_tokens.weight.data = embed_weights
+    
     for layer_idx, heads in heads_to_prune.items():
         attention_layer = model.model.layers[layer_idx].self_attn
         
-        # Calculate the dimension size of each head
-        num_heads = attention_layer.num_heads
-        head_size = attention_layer.q_proj.out_features // num_heads
-        
-        # Create masks to retain only the unpruned heads
-        keep_heads = [i for i in range(num_heads) if i not in heads]
+        # Recalculate keep_indices to reflect the reduced dimension per head
         keep_indices = torch.cat([torch.arange(h * head_size, (h + 1) * head_size) for h in keep_heads])
         
         # Prune q_proj
