@@ -55,15 +55,15 @@ model_name = 'meta-llama/Meta-Llama-3-8B'
 model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
 print(model)
 
-heads_to_prune = {
-    0: [0],  # Prune head 0 in the first layer
-}
-prune_attention_heads(model, heads_to_prune)
-print('-------------------------------------------------------------------')
-print('-------------------------------------------------------------------')
-print('-------------------------------------------------------------------')
-print('-------------------------------------------------------------------')
-print(model)
+# heads_to_prune = {
+#     0: [0],  # Prune head 0 in the first layer
+# }
+# prune_attention_heads(model, heads_to_prune)
+# print('-------------------------------------------------------------------')
+# print('-------------------------------------------------------------------')
+# print('-------------------------------------------------------------------')
+# print('-------------------------------------------------------------------')
+# print(model)
 
 tokenize = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 prompt = "hello guys, what's up I'm"
