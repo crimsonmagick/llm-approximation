@@ -1,5 +1,6 @@
 from triton.language import bfloat16
 
+from llama.pruning.attention_pruning import LlamaAttentionPruner
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
@@ -54,6 +55,8 @@ def prune_attention_heads(model, heads_to_prune):
 model_name = 'meta-llama/Meta-Llama-3-8B'
 model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
 print(model)
+pruner = LlamaAttentionPruner(model)
+pruner.prune(0)
 
 # heads_to_prune = {
 #     0: [0],  # Prune head 0 in the first layer
@@ -66,7 +69,7 @@ print(model)
 # print(model)
 
 tokenize = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-prompt = "hello guys, what's up I'm"
+prompt = "The Mark of Zorro is"
 tokens = tokenize(prompt, return_tensors='pt')
 input_ids = tokens["input_ids"].to(model.device)
 attention_mask = tokens["attention_mask"].to(model.device)
