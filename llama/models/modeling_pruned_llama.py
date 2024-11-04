@@ -50,13 +50,13 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         
         bsz, q_len, _ = hidden_states.size()
         
-        query_states_1 = self.q_proj(hidden_states)
-        key_states_1 = self.k_proj(hidden_states)
-        value_states_1 = self.v_proj(hidden_states)
+        query_states_projected = self.q_proj(hidden_states)
+        key_states_projected = self.k_proj(hidden_states)
+        value_states_projected = self.v_proj(hidden_states)
         
-        query_states_2 = query_states_1.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states_2 = key_states_1.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        value_states_2 = value_states_1.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        qs_per_attnhead = query_states_projected.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        ks_per_kvhead = key_states_projected.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        vs_per_kvhead = value_states_projected.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         
         if position_embeddings is None:
             logger.warning_once(
@@ -65,49 +65,49 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
                 "`position_embeddings` (Tuple of tensors, containing cos and sin). In v4.46 `position_ids` will be "
                 "removed and `position_embeddings` will be mandatory."
             )
-            cos, sin = self.rotary_emb(value_states_2, position_ids)
+            cos, sin = self.rotary_emb(vs_per_kvhead, position_ids)
         else:
             cos, sin = position_embeddings
-        query_states_3, key_states_3 = apply_rotary_pos_emb(query_states_2, key_states_2, cos, sin)
+        qs_pos_per_attnhead, ks_pos_per_kvhead = apply_rotary_pos_emb(qs_per_attnhead, ks_per_kvhead, cos, sin)
         
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-            key_states_3, value_states_2 = past_key_value.update(key_states_3, value_states_2, self.layer_idx, cache_kwargs)
+            ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx, cache_kwargs)
         
-        key_states_4 = self.repeat_kv(key_states_3, self.num_key_value_groups)
-        value_states_3 = self.repeat_kv(value_states_2, self.num_key_value_groups)
+        ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
+        vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
         
         causal_mask = attention_mask
         if attention_mask is not None:
-            causal_mask = causal_mask[:, :, :, : key_states_4.shape[-2]]
+            causal_mask = causal_mask[:, :, :, : ks_pos_grouped_per_head.shape[-2]]
         
         # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
         # Reference: https://github.com/pytorch/pytorch/issues/112577.
-        if query_states_3.device.type == "cuda" and causal_mask is not None:
-            query_states_3 = query_states_3.contiguous()
-            key_states_4 = key_states_4.contiguous()
-            value_states_3 = value_states_3.contiguous()
+        if qs_pos_per_attnhead.device.type == "cuda" and causal_mask is not None:
+            qs_pos_per_attnhead = qs_pos_per_attnhead.contiguous()
+            ks_pos_grouped_per_head = ks_pos_grouped_per_head.contiguous()
+            vs_pos_grouped_per_head = vs_pos_grouped_per_head.contiguous()
         
         # We dispatch to SDPA's Flash Attention or Efficient kernels via this `is_causal` if statement instead of an inline conditional assignment
         # in SDPA to support both torch.compile's dynamic shapes and full graph options. An inline conditional prevents dynamic shapes from compiling.
         is_causal = True if causal_mask is None and q_len > 1 else False
         
-        attn_output_1 = torch.nn.functional.scaled_dot_product_attention(
-            query_states_3,
-            key_states_4,
-            value_states_3,
+        attn_output_per_attnhead = torch.nn.functional.scaled_dot_product_attention(
+            qs_pos_per_attnhead,
+            ks_pos_grouped_per_head,
+            vs_pos_grouped_per_head,
             attn_mask=causal_mask,
             dropout_p=self.attention_dropout if self.training else 0.0,
             is_causal=is_causal,
         )
         
-        attn_output_2 = attn_output_1.transpose(1, 2).contiguous()
-        attn_output_3 = attn_output_2.view(bsz, q_len, -1)
+        attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
+        attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
         
-        attn_output_4 = self.o_proj(attn_output_3)
+        attn_projected = self.o_proj(attn_output_per_sequence)
         
-        return attn_output_4, None, past_key_value
+        return attn_projected, None, past_key_value
     
     @staticmethod
     def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
