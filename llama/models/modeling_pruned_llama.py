@@ -1,3 +1,5 @@
+from itertools import zip_longest
+
 from transformers.utils import logging
 
 from transformers import Cache
@@ -11,13 +13,33 @@ from torch import nn
 import math
 from typing import List, Optional, Tuple, Union
 
-
 logger = logging.get_logger(__name__)
 
 
 class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
-    def __init__(self, config: LlamaConfig, layer_idx: int):
+    def __init__(self, config: LlamaConfig, layer_idx: int, prune_heads: Optional[List[int]] = None):
         super().__init__(config, layer_idx)
+        self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
+        if self.prune_heads is not None:
+            q_ranges = []
+            keep_idxs = list(set(range(self.num_heads)) - set(self.prune_heads))
+            keep_iter = iter(keep_idxs)
+            start, end = keep_idxs[0], keep_idxs[0] + 1
+            for idx_pair in zip_longest(keep_iter, keep_idxs):
+                current_hd, next_hd = idx_pair
+                if next_hd is None:
+                    q_ranges.append((start, current_hd + 1))
+                else:
+                    if (next_hd - current_hd) == 1:
+                        end += 1
+                    else:
+                        q_ranges.append((start, end))
+                        start, end = next_hd, next_hd + 1
+            print(q_ranges)
+                
+                
+        print('hello')
+        
     
     def forward(
         self,
@@ -73,7 +95,8 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-            ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx, cache_kwargs)
+            ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx,
+                                                                     cache_kwargs)
         
         ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
         vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
@@ -102,8 +125,12 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             is_causal=is_causal,
         )
         
-        attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
-        attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
+        if self.prune_heads is not None:
+            attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
+            attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
+        else:
+            attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
+            attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
         
         attn_projected = self.o_proj(attn_output_per_sequence)
         
@@ -120,3 +147,15 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             return hidden_states
         hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
         return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+        
+    @staticmethod
+    def repeat_kv_pruned(states_per_kvhead: torch.Tensor, num_groups: int) -> torch.Tensor:
+        """
+        This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
+        num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+        """
+        batch, num_kv_heads, seq_len, head_dim = states_per_kvhead.shape
+        if num_groups == 1:
+            return states_per_kvhead
+        states_per_kvhead = states_per_kvhead[:, :, None, :, :].expand(batch, num_kv_heads, num_groups, seq_len, head_dim)
+        return states_per_kvhead.reshape(batch, num_kv_heads * num_groups, seq_len, head_dim)
