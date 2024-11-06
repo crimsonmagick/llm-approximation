@@ -1,4 +1,4 @@
-from itertools import zip_longest
+from itertools import zip_longest, chain
 
 from transformers.utils import logging
 
@@ -20,19 +20,23 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int, prune_heads: Optional[List[int]] = None):
         super().__init__(config, layer_idx)
         self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
+        self.keep_idxs = self.get_indices(self.num_heads, self.prune_heads, self.head_dim)
     
     def prune(self):
         if self.prune_heads is not None:
             # TODO validate prune_heads
-            keep_idxs = self.get_indices(self.num_heads, self.prune_heads, self.head_dim)
-            self.q_proj_trunc = self.prune_linear(self.q_proj, keep_idxs, 0)
-            self.o_proj_trunc = self.prune_linear(self.o_proj, keep_idxs, 1)
+            self.keep_hds = torch.tensor(self.get_heads(self.num_heads, self.prune_heads), dtype=torch.long,
+                                         device=self.q_proj.weight.device)
+            # self.q_proj_trunc = self.prune_linear(self.q_proj, self.keep_idxs, 0)
+            # self.o_proj_trunc = self.prune_linear(self.o_proj, self.keep_idxs, 1)
+            self.q_proj = self.prune_linear(self.q_proj, self.keep_idxs, 0)
+            self.o_proj = self.prune_linear(self.o_proj, self.keep_idxs, 1)
+            self.num_heads = self.num_heads - len(self.prune_heads)
             print('hi')
     
     @staticmethod
     @torch.no_grad()
     def prune_linear(to_prune: nn.Linear, keep_idxs, dim) -> nn.Linear:
-        
         pruned_weights = torch.index_select(
             to_prune.weight, dim, torch.tensor(keep_idxs, dtype=torch.long, device=to_prune.weight.device))
         pruned_linear = nn.Linear(in_features=pruned_weights.size(dim=1),
@@ -60,6 +64,26 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
                     start, end = next_hd, next_hd + 1
         print(keep_idxs)
         return keep_idxs
+    
+    @staticmethod
+    def get_heads(num_hds, hds_to_prune):
+        keep_ranges = []
+        keep_hds = list(set(range(num_hds)) - set(hds_to_prune))
+        keep_iter = iter(keep_hds)
+        start, end = keep_hds[0], keep_hds[0] + 1
+        for idx_pair in zip_longest(keep_iter, keep_iter):
+            current_hd, next_hd = idx_pair
+            if next_hd is None:
+                keep_ranges.extend((start , current_hd + 1))
+            else:
+                if (next_hd - current_hd) == 1:
+                    end += 1
+                else:
+                    keep_ranges.extend((start, end))
+                    start, end = next_hd, next_hd + 1
+        print(keep_hds)
+        return keep_hds
+    
     
     def forward(
         self,
@@ -168,8 +192,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
         return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
     
-    @staticmethod
-    def repeat_kv_pruned(states_per_kvhead: torch.Tensor, num_groups: int) -> torch.Tensor:
+    def repeat_kv_pruned(self, states_per_kvhead: torch.Tensor, num_groups: int) -> torch.Tensor:
         """
         This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
         num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
@@ -179,4 +202,5 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             return states_per_kvhead
         states_per_kvhead = states_per_kvhead[:, :, None, :, :].expand(batch, num_kv_heads, num_groups, seq_len,
                                                                        head_dim)
-        return states_per_kvhead.reshape(batch, num_kv_heads * num_groups, seq_len, head_dim)
+        unpruned = states_per_kvhead.reshape(batch, num_kv_heads * num_groups, seq_len, head_dim)
+        return torch.index_select(unpruned, 1, self.keep_hds)
