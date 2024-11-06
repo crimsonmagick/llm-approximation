@@ -30,6 +30,7 @@ class LlamaAttentionPruner:
         pruned_llama_attention.to(llama_attention.q_proj.weight.device, dtype=llama_attention.q_proj.weight.dtype)
 
         pruned_llama_attention.load_state_dict(llama_attention.state_dict())
+        pruned_llama_attention.prune()
         self.model.model.layers[head_idx].self_attn = pruned_llama_attention
         
         print(self.model)

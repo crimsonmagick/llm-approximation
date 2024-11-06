@@ -20,26 +20,46 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int, prune_heads: Optional[List[int]] = None):
         super().__init__(config, layer_idx)
         self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
+    
+    def prune(self):
         if self.prune_heads is not None:
-            q_ranges = []
-            keep_idxs = list(set(range(self.num_heads)) - set(self.prune_heads))
-            keep_iter = iter(keep_idxs)
-            start, end = keep_idxs[0], keep_idxs[0] + 1
-            for idx_pair in zip_longest(keep_iter, keep_idxs):
-                current_hd, next_hd = idx_pair
-                if next_hd is None:
-                    q_ranges.append((start, current_hd + 1))
-                else:
-                    if (next_hd - current_hd) == 1:
-                        end += 1
-                    else:
-                        q_ranges.append((start, end))
-                        start, end = next_hd, next_hd + 1
-            print(q_ranges)
-                
-                
-        print('hello')
+            # TODO validate prune_heads
+            keep_idxs = self.get_indices(self.num_heads, self.prune_heads, self.head_dim)
+            self.q_proj_trunc = self.prune_linear(self.q_proj, keep_idxs, 0)
+            self.o_proj_trunc = self.prune_linear(self.o_proj, keep_idxs, 1)
+            print('hi')
+    
+    @staticmethod
+    @torch.no_grad()
+    def prune_linear(to_prune: nn.Linear, keep_idxs, dim) -> nn.Linear:
         
+        pruned_weights = torch.index_select(
+            to_prune.weight, dim, torch.tensor(keep_idxs, dtype=torch.long, device=to_prune.weight.device))
+        pruned_linear = nn.Linear(in_features=pruned_weights.size(dim=1),
+                                  out_features=pruned_weights.size(dim=0),
+                                  bias=False, device=to_prune.weight.device, dtype=to_prune.weight.dtype)
+        pruned_linear.train = to_prune.train
+        pruned_linear.weight.copy_(pruned_weights)
+        return pruned_linear
+    
+    @staticmethod
+    def get_indices(num_hds, hds_to_prune, head_dim):
+        keep_idxs = []
+        keep_hds = list(set(range(num_hds)) - set(hds_to_prune))
+        keep_iter = iter(keep_hds)
+        start, end = keep_hds[0], keep_hds[0] + 1
+        for idx_pair in zip_longest(keep_iter, keep_iter):
+            current_hd, next_hd = idx_pair
+            if next_hd is None:
+                keep_idxs.extend(list(range(start * head_dim, (current_hd + 1) * head_dim)))
+            else:
+                if (next_hd - current_hd) == 1:
+                    end += 1
+                else:
+                    keep_idxs.extend(list(range(start * head_dim, end * head_dim)))
+                    start, end = next_hd, next_hd + 1
+        print(keep_idxs)
+        return keep_idxs
     
     def forward(
         self,
@@ -98,8 +118,12 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx,
                                                                      cache_kwargs)
         
-        ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
-        vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
+        if self.prune_heads is None:
+            ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
+            vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
+        else:
+            ks_pos_grouped_per_head = self.repeat_kv_pruned(ks_pos_per_kvhead, self.num_key_value_groups)
+            vs_pos_grouped_per_head = self.repeat_kv_pruned(vs_per_kvhead, self.num_key_value_groups)
         
         causal_mask = attention_mask
         if attention_mask is not None:
@@ -125,12 +149,8 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             is_causal=is_causal,
         )
         
-        if self.prune_heads is not None:
-            attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
-            attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
-        else:
-            attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
-            attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
+        attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
+        attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)
         
         attn_projected = self.o_proj(attn_output_per_sequence)
         
@@ -147,7 +167,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             return hidden_states
         hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
         return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
-        
+    
     @staticmethod
     def repeat_kv_pruned(states_per_kvhead: torch.Tensor, num_groups: int) -> torch.Tensor:
         """
@@ -157,5 +177,6 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         batch, num_kv_heads, seq_len, head_dim = states_per_kvhead.shape
         if num_groups == 1:
             return states_per_kvhead
-        states_per_kvhead = states_per_kvhead[:, :, None, :, :].expand(batch, num_kv_heads, num_groups, seq_len, head_dim)
+        states_per_kvhead = states_per_kvhead[:, :, None, :, :].expand(batch, num_kv_heads, num_groups, seq_len,
+                                                                       head_dim)
         return states_per_kvhead.reshape(batch, num_kv_heads * num_groups, seq_len, head_dim)
