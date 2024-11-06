@@ -20,15 +20,13 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int, prune_heads: Optional[List[int]] = None):
         super().__init__(config, layer_idx)
         self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
-        self.keep_idxs = self.get_indices(self.num_heads, self.prune_heads, self.head_dim)
+        self.keep_idxs = self.get_keep_indices(self.get_heads(self.num_heads, self.prune_heads), self.head_dim)
     
     def prune(self):
         if self.prune_heads is not None:
             # TODO validate prune_heads
             self.keep_hds = torch.tensor(self.get_heads(self.num_heads, self.prune_heads), dtype=torch.long,
                                          device=self.q_proj.weight.device)
-            # self.q_proj_trunc = self.prune_linear(self.q_proj, self.keep_idxs, 0)
-            # self.o_proj_trunc = self.prune_linear(self.o_proj, self.keep_idxs, 1)
             self.q_proj = self.prune_linear(self.q_proj, self.keep_idxs, 0)
             self.o_proj = self.prune_linear(self.o_proj, self.keep_idxs, 1)
             self.num_heads = self.num_heads - len(self.prune_heads)
@@ -47,43 +45,12 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         return pruned_linear
     
     @staticmethod
-    def get_indices(num_hds, hds_to_prune, head_dim):
-        keep_idxs = []
-        keep_hds = list(set(range(num_hds)) - set(hds_to_prune))
-        keep_iter = iter(keep_hds)
-        start, end = keep_hds[0], keep_hds[0] + 1
-        for idx_pair in zip_longest(keep_iter, keep_iter):
-            current_hd, next_hd = idx_pair
-            if next_hd is None:
-                keep_idxs.extend(list(range(start * head_dim, (current_hd + 1) * head_dim)))
-            else:
-                if (next_hd - current_hd) == 1:
-                    end += 1
-                else:
-                    keep_idxs.extend(list(range(start * head_dim, end * head_dim)))
-                    start, end = next_hd, next_hd + 1
-        print(keep_idxs)
-        return keep_idxs
+    def get_keep_indices(keep_hds, head_dim):
+        return list(chain.from_iterable(map(lambda i: range(head_dim * i, head_dim * (i + 1)), range(len(keep_hds)))))
     
     @staticmethod
     def get_heads(num_hds, hds_to_prune):
-        keep_ranges = []
-        keep_hds = list(set(range(num_hds)) - set(hds_to_prune))
-        keep_iter = iter(keep_hds)
-        start, end = keep_hds[0], keep_hds[0] + 1
-        for idx_pair in zip_longest(keep_iter, keep_iter):
-            current_hd, next_hd = idx_pair
-            if next_hd is None:
-                keep_ranges.extend((start , current_hd + 1))
-            else:
-                if (next_hd - current_hd) == 1:
-                    end += 1
-                else:
-                    keep_ranges.extend((start, end))
-                    start, end = next_hd, next_hd + 1
-        print(keep_hds)
-        return keep_hds
-    
+        return list(set(range(num_hds)) - set(hds_to_prune))
     
     def forward(
         self,
