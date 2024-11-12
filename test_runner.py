@@ -1,6 +1,7 @@
 import logging
 
 from large_language_model_service import get_model
+from llama.pruning.attention_pruning import LlamaAttentionPruner
 from llm_type import LLMType
 from datasets import load_dataset
 import sys
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class TestRunner:
     
-    def __init__(self, llm_type, model_path, dataset_path: tuple):
-        self.llm = get_model(llm_type, model_path)
+    def __init__(self, model, dataset_path: tuple):
+        self.llm = model
         self.test_data = load_dataset(*dataset_path)["test"].filter(
             lambda ex: ex["text"] and ex["text"].strip() != ""
         )
@@ -33,11 +34,7 @@ class TestRunner:
             # detokenized = self.llm.detokenize(generated_tokens)
             # logger.info(f"Prompt: {text}, generated: {detokenized}")
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
-
-
-def main():
-    runner = TestRunner(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B',
-                        ("Salesforce/wikitext", 'wikitext-2-v1'))
+    
     # runner = TestRunner(LLMType.LLAMA_3, "nvidia/Llama-3.1-Minitron-4B-Width-Base", ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner = TestRunner(LLMType.LLAMA_2, '/home/welb/ai/models/decapoda-research-llama-7B-hf',
     #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
@@ -45,6 +42,15 @@ def main():
     #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner =  TestRunner(LLMType.PRUNED, 'google-bert/bert-base-uncased',
     #                                          ("Salesforce/wikitext", 'wikitext-2-v1'))
+
+
+def main():
+    model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
+    pruner = LlamaAttentionPruner(model.model)
+    
+    pruner.prune_heads( {0: list(range(0, 16))})
+    # pruner.prune_layers([16, 17])
+    runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(20)
 
 
