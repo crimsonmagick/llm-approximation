@@ -130,14 +130,18 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         # in SDPA to support both torch.compile's dynamic shapes and full graph options. An inline conditional prevents dynamic shapes from compiling.
         is_causal = True if causal_mask is None and q_len > 1 else False
         
-        attn_output_per_attnhead = torch.nn.functional.scaled_dot_product_attention(
-            qs_pos_per_attnhead,
-            ks_pos_grouped_per_head,
-            vs_pos_grouped_per_head,
-            attn_mask=causal_mask,
-            dropout_p=self.attention_dropout if self.training else 0.0,
-            is_causal=is_causal,
-        )
+        if torch.numel(qs_pos_per_attnhead) != 0:
+        
+            attn_output_per_attnhead = torch.nn.functional.scaled_dot_product_attention(
+                qs_pos_per_attnhead,
+                ks_pos_grouped_per_head,
+                vs_pos_grouped_per_head,
+                attn_mask=causal_mask,
+                dropout_p=self.attention_dropout if self.training else 0.0,
+                is_causal=is_causal,
+            )
+        else:
+            attn_output_per_attnhead = qs_per_attnhead
         
         attn_output_per_sequence_per_attnhead = attn_output_per_attnhead.transpose(1, 2).contiguous()
         attn_output_per_sequence = attn_output_per_sequence_per_attnhead.view(bsz, q_len, -1)

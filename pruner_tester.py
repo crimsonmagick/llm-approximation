@@ -11,7 +11,7 @@ pruner = LlamaModelPruner(model)
 
 # pruner.prune_heads( {0: [0, 1]})
 # pruner.prune_layers([16, 17])
-# pruner.prune_heads( {0: list(range(0, 1))})
+pruner.prune_heads( {0: list(range(0, 32))})
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
