@@ -1,7 +1,7 @@
 import logging
 
 from large_language_model_service import get_model
-from llama.pruning.attention_pruning import LlamaAttentionPruner
+from llama.pruning.attention_pruning import LlamaModelPruner
 from llm_type import LLMType
 from datasets import load_dataset
 import sys
@@ -46,7 +46,7 @@ class TestRunner:
 
 def main():
     model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
-    pruner = LlamaAttentionPruner(model.model)
+    pruner = LlamaModelPruner(model.model)
     
     pruner.prune_heads( {0: list(range(0, 16))})
     # pruner.prune_layers([16, 17])

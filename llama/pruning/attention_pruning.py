@@ -11,7 +11,7 @@ from transformers.models.llama.modeling_llama import LlamaSdpaAttention
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class LlamaAttentionPruner:
+class LlamaModelPruner:
     
     def __init__(self, model: LlamaForCausalLM):
         self.model = model

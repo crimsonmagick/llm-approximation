@@ -1,4 +1,4 @@
-from llama.pruning.attention_pruning import LlamaAttentionPruner
+from llama.pruning.attention_pruning import LlamaModelPruner
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
@@ -7,11 +7,11 @@ model_name = 'meta-llama/Meta-Llama-3-8B'
 torch.manual_seed(633)
 model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
 print(model)
-pruner = LlamaAttentionPruner(model)
+pruner = LlamaModelPruner(model)
 
 # pruner.prune_heads( {0: [0, 1]})
 # pruner.prune_layers([16, 17])
-pruner.prune_heads( {0: list(range(0, 16))})
+# pruner.prune_heads( {0: list(range(0, 1))})
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')

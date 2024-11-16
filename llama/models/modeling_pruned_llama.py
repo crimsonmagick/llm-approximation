@@ -30,7 +30,6 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             self.q_proj = self.prune_linear(self.q_proj, self.keep_idxs, 0)
             self.o_proj = self.prune_linear(self.o_proj, self.keep_idxs, 1)
             self.num_heads = self.num_heads - len(self.prune_heads)
-            print('hi')
     
     @staticmethod
     @torch.no_grad()
