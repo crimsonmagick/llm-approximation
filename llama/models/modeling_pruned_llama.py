@@ -21,6 +21,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         super().__init__(config, layer_idx)
         self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
         self.keep_idxs = self.get_keep_indices(self.get_heads(self.num_heads, self.prune_heads), self.head_dim)
+        self.keep_kv_idxs = self.get_keep_indices(                      )
     
     def prune(self):
         if self.prune_heads is not None:
@@ -46,6 +47,11 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     @staticmethod
     def get_keep_indices(keep_hds, head_dim):
         return list(chain.from_iterable(map(lambda i: range(head_dim * i, head_dim * (i + 1)), range(len(keep_hds)))))
+    
+    @staticmethod
+    def get_keep_kv_heads(keep_hds, num_groups):
+        kv_heads = {hd // num_groups for hd in keep_hds}
+        return list(kv_heads)
     
     @staticmethod
     def get_heads(num_hds, hds_to_prune):
