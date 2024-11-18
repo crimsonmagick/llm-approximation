@@ -9,9 +9,9 @@ model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16,
 print(model)
 pruner = LlamaModelPruner(model)
 
-# pruner.prune_heads( {0: [0, 1]})
+pruner.prune_heads( {25: [19]})
 # pruner.prune_layers([16, 17])
-pruner.prune_heads( {0: list(range(0, 32))})
+# pruner.prune_heads( {0: list(range(0, 32))})
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
@@ -19,7 +19,7 @@ print('-------------------------------------------------------------------')
 print(model)
 
 tokenize = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-prompt = "The Mark of Zorro is a film about "
+prompt = "The Mask of Zorro (1998 film) summary: "
 tokens = tokenize(prompt, return_tensors='pt')
 input_ids = tokens["input_ids"].to(model.device)
 attention_mask = tokens["attention_mask"].to(model.device)

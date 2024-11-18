@@ -20,8 +20,10 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int, prune_heads: Optional[List[int]] = None):
         super().__init__(config, layer_idx)
         self.prune_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
-        self.keep_idxs = self.get_keep_indices(self.get_heads(self.num_heads, self.prune_heads), self.head_dim)
-        self.keep_kv_idxs = self.get_keep_indices(                      )
+        keep_heads = self.get_heads(self.num_heads, self.prune_heads)
+        keep_idxs = torch.tensor(self.get_keep_indices(keep_heads, self.head_dim), dtype=torch.long, device=self.q_proj.weight.device)
+        self.register_buffer('keep_idxs', keep_idxs, False)
+        # self.keep_kv_idxs = self.get_keep_indices(self.get_keep_kv_heads(keep_heads, self.num_key_value_groups), self.head_dim)
     
     def prune(self):
         if self.prune_heads is not None:
@@ -46,7 +48,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     
     @staticmethod
     def get_keep_indices(keep_hds, head_dim):
-        return list(chain.from_iterable(map(lambda i: range(head_dim * i, head_dim * (i + 1)), range(len(keep_hds)))))
+        return list(chain.from_iterable(map(lambda i: range(head_dim * i, head_dim * (i + 1)), keep_hds)))
     
     @staticmethod
     def get_keep_kv_heads(keep_hds, num_groups):
