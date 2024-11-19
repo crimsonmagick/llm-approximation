@@ -25,15 +25,15 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         self.register_buffer('keep_hds',
                              torch.tensor(self.get_heads(self.num_heads, self.pruned_heads), dtype=torch.long,
                                           device=self.q_proj.weight.device), False)
-        self.prune_kv_heads = True
-        if self.prune_kv_heads:
-            self.keep_kv_heads = self.get_keep_kv_heads(self.keep_heads, self.num_key_value_groups)
-            self.register_buffer('keep_kv_idxs',
-                                 torch.tensor(self.get_keep_indices(self.keep_kv_heads, self.head_dim), dtype=torch.long,
-                                              device=self.q_proj.weight.device), False)
-            self.pruned_kv_counts = self.build_pruned_kv_counts(self.keep_heads, self.num_key_value_groups)
-            self.num_key_value_groups = len(self.pruned_kv_counts)
-        print("__init__ finished")
+        self.keep_kv_heads = self.get_keep_kv_heads(self.keep_heads, self.num_key_value_groups)
+        self.register_buffer('keep_kv_idxs',
+                             torch.tensor(self.get_keep_indices(self.keep_kv_heads, self.head_dim),
+                                          dtype=torch.long,
+                                          device=self.q_proj.weight.device), False)
+        self.register_buffer('pruned_kv_counts',
+                             torch.tensor(self.build_pruned_kv_counts(self.keep_heads, self.num_key_value_groups),
+                                          dtype=torch.long, device=self.q_proj.weight.device), False)
+        self.num_key_value_groups = len(self.pruned_kv_counts)
     
     def prune(self):
         if self.pruned_heads is not None:
@@ -42,10 +42,9 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             self.o_proj = self.prune_linear(self.o_proj, self.keep_idxs, 1)
             self.num_heads = self.num_heads - len(self.pruned_heads)
             
-            if self.prune_kv_heads:
-                self.k_proj = self.prune_linear(self.k_proj, self.keep_kv_idxs, 0)
-                self.v_proj = self.prune_linear(self.v_proj, self.keep_kv_idxs, 0)
-                self.num_key_value_heads = len(self.keep_kv_heads)
+            self.k_proj = self.prune_linear(self.k_proj, self.keep_kv_idxs, 0)
+            self.v_proj = self.prune_linear(self.v_proj, self.keep_kv_idxs, 0)
+            self.num_key_value_heads = len(self.keep_kv_heads)
     
     @staticmethod
     def build_pruned_kv_counts(keep_heads, num_key_value_groups) -> list[int]:
@@ -56,12 +55,11 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
                 kv_counts[group_idx] = 0
             kv_counts[group_idx] += 1
         return list(kv_counts.values())
-
-        # return len({i // group_size for i in keep_heads})
-    
+        
     @staticmethod
     @torch.no_grad()
     def prune_linear(to_prune: nn.Linear, keep_idxs, dim) -> nn.Linear:
+        # TODO add support for pruning biases (not needed with Llama 3 OOTB)
         pruned_weights = torch.index_select(to_prune.weight, dim, keep_idxs)
         pruned_linear = nn.Linear(in_features=pruned_weights.size(dim=1),
                                   out_features=pruned_weights.size(dim=0),
@@ -191,14 +189,10 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
     
     @staticmethod
-    def repeat_kv_pruned(states_per_kvhead: torch.Tensor, pruned_kv_counts: list[int]) -> torch.Tensor:
+    def repeat_kv_pruned(states_per_kvhead: torch.Tensor, pruned_kv_counts) -> torch.Tensor:
         """
-        The hidden states go from (batch, num_key_value_heads (ignored), seqlen, head_dim) to
+        The hidden states go from (batch, num_key_value_heads, seqlen, head_dim) to
         (batch, num_attention_heads, seqlen, head_dim)
         """
-        batch, _, seq_len, head_dim = states_per_kvhead.shape
-        splits = states_per_kvhead.split(1, dim=1)
-        zipped = zip(splits, pruned_kv_counts)
-        repeated = tuple(map(lambda t: t[0].expand(batch, t[1], seq_len, head_dim), zipped))
-        return torch.cat(repeated, dim=1)
-
+        # Repeat states along the 1st dimension (specific key_value_heads) according to `pruned_kv_counts`
+        return states_per_kvhead.repeat_interleave(pruned_kv_counts, dim=1)
