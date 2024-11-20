@@ -9,11 +9,11 @@ model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16,
 print(model)
 pruner = LlamaModelPruner(model)
 
-pruner.prune_heads({0: [1, 6, 12, 16, 31], 3: [2, 6], 4: [5, 9], 25: [19]})
+# pruner.prune_heads({0: [1, 6, 12, 16, 31], 3: [2, 6], 4: [5, 9], 25: [19]})
 # pruner.prune_heads({0: [0]})
 # pruner.prune_heads( {1: list(range(0, 26)), 3: [2, 6], 4: [5, 9], 25: [19]})
 # pruner.prune_layers([16, 17])
-# pruner.prune_heads( {0: list(range(0, 32))})
+pruner.prune_heads( {0: list(range(0, 32))})
 # pruner.prune_heads({0: [0,1,2,3,4,5,6,7]})
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')
