@@ -47,10 +47,10 @@ class TestRunner:
 def main():
     model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
     pruner = LlamaModelPruner(model.model)
-    pruner.prune_heads({0: [1, 6, 12, 16, 31], 3: [2, 6], 4: [5, 9], 25: [19], 30:list(range(0,22))})
-    
-    # pruner.prune_heads( {0: list(range(0, 16))})
-    # pruner.prune_layers([16, 17])
+    heads = dict()
+    for i in range(0, 32):
+        heads[i] = list(range(0, 31))
+    pruner.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(20)
