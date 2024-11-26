@@ -17,10 +17,6 @@ class TestRunner:
             lambda ex: ex["text"] and ex["text"].strip() != ""
         )
     
-    def __log_memory(self, prexfix):
-        logger.info(f"{prexfix} Allocated Memory: {self.llm.get_allocated_memory() / 1024 ** 2:.2f} MB")
-        logger.info(f"{prexfix} Reserved Memory: {self.llm.get_reserved_memory() / 1024 ** 2:.2f} MB")
-    
     def batch_evaluate(self, rows_to_evaluate):
         for example in self.test_data.select(range(rows_to_evaluate)):
             text = example["text"]
@@ -46,7 +42,7 @@ def main():
     pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
-        heads[i] = list(range(0, 31))
+        heads[i] = list()#list(range(0, 31))
     pruner.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))

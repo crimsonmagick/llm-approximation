@@ -66,18 +66,6 @@ class LargeLanguageModel(ABC):
         per_token_loss = functional.cross_entropy(logits, labels, reduction='none') # vector of per token losses
         attention_mask_vector = attention_mask[:, :-1].view(-1).contiguous()
         return per_token_loss * attention_mask_vector # apply the attention mask to remove padding, which can skew perplexity measurements
-    
-    def get_allocated_memory(self):
-        if self.device == "cuda":
-            return torch.cuda.memory_allocated(device=self.device)
-        self.logger.warning(f"Unknown device={self.device}, return 0 MB as allocated memory")
-        return 0
-    
-    def get_reserved_memory(self):
-        if self.device == "cuda":
-            return torch.cuda.memory_reserved(device=self.device)
-        self.logger.warning(f"Unknown device={self.device}, return 0 MB as reserved memory")
-        return 0
 
 
 class MissingParameterException(Exception):

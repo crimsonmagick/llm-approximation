@@ -1,5 +1,6 @@
 import logging
 import time
+import torch
 
 import pynvml
 from torch import tensor
@@ -44,7 +45,7 @@ class MetricsRecorder:
 
 def capture_evaluation(func):
     class CaptureEvaluation:
-        def __init__(self, func):
+        def __init__(self):
             self.token_count = 0
             self.execution_time_ms = 0
             self.evaluation_count = 0
@@ -71,10 +72,13 @@ def capture_evaluation(func):
             logger.info(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
                 f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} j")
+            logger.info(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
+            logger.info(f"Reserved Memory: { torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
             return evaluation
     
-    capture = CaptureEvaluation(func)
+    capture = CaptureEvaluation()
     return lambda *args, **kwargs: capture.capture(*args, **kwargs)
+    
 
 def capture_loss(func):
     class CaptureLoss:
