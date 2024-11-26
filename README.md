@@ -1,1 +1,1 @@
-Test Runner for Measuring the Performance of Large Language Models using CUDA.
+Evaluation and Test Harness for LLM Approximations.
