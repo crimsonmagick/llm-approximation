@@ -27,22 +27,13 @@ class TestRunner:
             # detokenized = self.llm.detokenize(generated_tokens)
             # logger.info(f"Prompt: {text}, generated: {detokenized}")
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
-    
-    # runner = TestRunner(LLMType.LLAMA_3, "nvidia/Llama-3.1-Minitron-4B-Width-Base", ("Salesforce/wikitext", 'wikitext-2-v1'))
-    # runner = TestRunner(LLMType.LLAMA_2, '/home/welb/ai/models/decapoda-research-llama-7B-hf',
-    #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
-    # runner = TestRunner(LLMType.PRUNED, '/home/welb/workspace/LLM-Pruner/prune_log/llama_prune/pytorch_model.bin',
-    #                     ("Salesforce/wikitext", 'wikitext-2-v1'))
-    # runner =  TestRunner(LLMType.PRUNED, 'google-bert/bert-base-uncased',
-    #                                          ("Salesforce/wikitext", 'wikitext-2-v1'))
-
 
 def main():
     model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
     pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
-        heads[i] = list()#list(range(0, 31))
+        heads[i] = list(range(0,16))
     pruner.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
