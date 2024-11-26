@@ -1,12 +1,9 @@
 import logging
 
 from large_language_model_service import get_model
-from llama.pruning.attention_pruning import LlamaModelPruner
+from src.pruning.attention_pruning import LlamaModelPruner
 from llm_type import LLMType
 from datasets import load_dataset
-import sys
-
-sys.path.append('/home/welb/workspace/LLM-Pruner')
 
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)

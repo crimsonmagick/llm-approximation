@@ -1,4 +1,4 @@
-from llama.pruning.attention_pruning import LlamaModelPruner
+from src.pruning.attention_pruning import LlamaModelPruner
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
@@ -9,8 +9,9 @@ model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16,
 print(model)
 pruner = LlamaModelPruner(model)
 heads = dict()
-for i in range(0, 32):
-    heads[i] = list(range(0, 32))
+for i in range(16, 19):
+    # heads[i] = list(range(0, 32))
+    heads[i] = [5]
 pruner.prune_heads(heads)
 
 print('-------------------------------------------------------------------')
@@ -20,9 +21,10 @@ print('-------------------------------------------------------------------')
 print(model)
 
 tokenize = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-prompt = ("[SYSTEM] You are a film summary assistant. Briefly Provide the names of the main characters and the director of the moving. Summarize the plot of the movie in great detail.[/SYSTEM]"
-          "[USER] Provide a summary to The Mask of Zorro (1998 film)[/USER]"
-          "[ASSISTANT]")
+prompt = (
+    "[SYSTEM] You are a film summary assistant. Briefly Provide the names of the main characters and the director of the moving. Summarize the plot of the movie in great detail.[/SYSTEM]"
+    "[USER] Provide a summary to The Mask of Zorro (1998 film)[/USER]"
+    "[ASSISTANT]")
 tokens = tokenize(prompt, return_tensors='pt')
 input_ids = tokens["input_ids"].to(model.device)
 attention_mask = tokens["attention_mask"].to(model.device)

@@ -1,10 +1,8 @@
 import logging
-from itertools import chain
 
 import torch
-from torch import no_grad
 
-from llama.models.modeling_pruned_llama import PrunedLlamaSdpaAttention
+from src.llama.models.modeling_pruned_llama import PrunedLlamaSdpaAttention
 from transformers import LlamaForCausalLM
 from transformers.models.llama.modeling_llama import LlamaSdpaAttention
 

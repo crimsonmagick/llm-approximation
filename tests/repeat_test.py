@@ -1,7 +1,7 @@
 import torch
 from torch import tensor
 
-from llama.models.modeling_pruned_llama import PrunedLlamaSdpaAttention
+from src.llama.models.modeling_pruned_llama import PrunedLlamaSdpaAttention
 
 # Sample inputs
 batch = 2

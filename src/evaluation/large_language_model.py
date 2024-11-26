@@ -4,10 +4,9 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn.functional as functional
-from triton.language.semantic import reduction
 
 from llm_type import LLMType
-from metrics import capture_evaluation, capture_loss
+from src.metrics.metrics import capture_evaluation, capture_loss
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 
