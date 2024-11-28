@@ -17,15 +17,16 @@ class TestRunner:
             lambda ex: ex["text"] and ex["text"].strip() != ""
         )
     
-    def batch_evaluate(self, rows_to_evaluate):
-        for example in self.test_data.select(range(rows_to_evaluate)):
-            text = example["text"]
-            tokens = self.llm.tokenize(text)
-            evaluation = self.llm.evaluate(tokens)
+    def batch_evaluate(self, rows_to_evaluate, batch_size=5):
+        num_batches = (rows_to_evaluate + batch_size - 1) // batch_size
+        for batch_index in range(num_batches):
+            start_idx = batch_index * batch_size
+            end_idx = min(start_idx + batch_size, rows_to_evaluate)
+            batch = self.test_data.select(range(start_idx, end_idx))
+            prompts = [example["text"] for example in batch]
+            tokens = self.llm.tokenize(prompts)
+            self.llm.evaluate(tokens)
             self.llm.per_token_losses(tokens)
-            # generated_tokens = evaluation[0]
-            # detokenized = self.llm.detokenize(generated_tokens)
-            # logger.info(f"Prompt: {text}, generated: {detokenized}")
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
 
 def main():
@@ -33,7 +34,7 @@ def main():
     pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
-        heads[i] = list(range(0,16))
+        heads[i] = list()
     pruner.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))

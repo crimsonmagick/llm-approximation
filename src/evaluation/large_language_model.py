@@ -8,6 +8,8 @@ import torch.nn.functional as functional
 from llm_type import LLMType
 from src.metrics.metrics import capture_evaluation, capture_loss
 from transformers import AutoTokenizer, LlamaForCausalLM
+from transformers.tokenization_utils_base import TruncationStrategy
+from transformers.utils import PaddingStrategy
 
 
 class LargeLanguageModel(ABC):
@@ -64,7 +66,7 @@ class LargeLanguageModel(ABC):
         logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
         logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size * sequence_length, vocab_size]
         per_token_loss = functional.cross_entropy(logits, labels, reduction='none') # vector of per token losses
-        attention_mask_vector = attention_mask[:, :-1].view(-1).contiguous()
+        attention_mask_vector = attention_mask[:, :-1].reshape(-1).contiguous()
         return per_token_loss * attention_mask_vector # apply the attention mask to remove padding, which can skew perplexity measurements
 
 
@@ -89,8 +91,8 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
         return self.tokenizer.decode(tokens)
     
     def tokenize(self, prompt):
-        return self.tokenizer(prompt, return_tensors='pt',
-                              max_length=512).to(self.model.device)
+        return self.tokenizer(prompt, return_tensors='pt', padding=PaddingStrategy.LONGEST, padding_side='left',
+                              truncation=TruncationStrategy.LONGEST_FIRST, max_length=512).to(self.model.device)
     
     def vocab_size(self):
         return self.tokenizer.vocab_size

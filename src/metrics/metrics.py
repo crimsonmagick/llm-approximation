@@ -48,7 +48,7 @@ def capture_evaluation(func):
         def __init__(self):
             self.token_count = 0
             self.execution_time_ms = 0
-            self.evaluation_count = 0
+            self.batch_count = 0
             self.func = func
             self.energy_usage_mj = 0
         
@@ -63,11 +63,11 @@ def capture_evaluation(func):
             self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
-            self.evaluation_count += 1
+            self.batch_count += 1
             average_time_per_token_ms = self.execution_time_ms / self.token_count
             average_energy_per_token_mj = self.energy_usage_mj / self.token_count
             logger.info(
-                f"evaluation_count={self.evaluation_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
+                f"batch_count={self.batch_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
                 f"energy_usage={self.energy_usage_mj / 1000:.2f} j")
             logger.info(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
