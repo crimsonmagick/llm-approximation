@@ -1,3 +1,4 @@
+import gc
 import logging
 
 import torch
@@ -17,7 +18,8 @@ class LlamaModelPruner:
     @torch.no_grad()
     def prune_heads(self, head_dictionary):
         for layer_idx, head_idxs in head_dictionary.items():
-            llama_attention = self.model.model.layers[layer_idx].self_attn
+            transformer_block = self.model.model.layers[layer_idx]
+            llama_attention = transformer_block.self_attn
             if not isinstance(llama_attention, LlamaSdpaAttention):
                 error_message = f'Only LlamaSdpaAttention is currently supported, type={type(llama_attention)}'
                 logger.error(error_message)
@@ -30,7 +32,17 @@ class LlamaModelPruner:
 
             pruned_llama_attention.load_state_dict(llama_attention.state_dict())
             pruned_llama_attention.prune()
-            self.model.model.layers[layer_idx].self_attn = pruned_llama_attention
+            transformer_block.self_attn = pruned_llama_attention
+            referrers = gc.get_referrers(llama_attention)
+            print('any params in grad graph?')
+            for param in llama_attention.parameters():
+                print(param.grad_fn)
+            print(f"References to llama_attention: {len(referrers)}")
+            for ref in referrers:
+                print(type(ref), ref)
+            for param in llama_attention.parameters():
+                param.data = param.data.detach().cpu()
+            del llama_attention
             
     @torch.no_grad()
     def prune_layers(self, layers):

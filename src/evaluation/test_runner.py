@@ -1,4 +1,7 @@
 import logging
+import gc
+
+import torch
 
 from large_language_model_service import get_model
 from src.pruning.attention_pruning import LlamaModelPruner
@@ -37,16 +40,22 @@ def main():
     #
     # runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
     # runner.batch_evaluate(100)
-    
-    print('--------------------------------')
-    print('PRUNED')
-    print('--------------------------------')
-    
+    #
+    # print('--------------------------------')
+    # print('PRUNED')
+    # print('--------------------------------')
+
+    print("Before pruning:")
+    print(torch.cuda.memory_summary())
     pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
-        heads[i] = list()
+        heads[i] = [0, 1, 2, 3]
     pruner.prune_heads(heads)
+    gc.collect()
+    torch.cuda.empty_cache()
+    print("After pruning:")
+    print(torch.cuda.memory_summary())
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(100)
