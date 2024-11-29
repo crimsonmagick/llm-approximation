@@ -134,12 +134,12 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx,
                                                                      cache_kwargs)
         
-        # if self.pruned_heads is None:
-        ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
-        vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
-        # else:
-        #     ks_pos_grouped_per_head = self.repeat_kv_pruned(ks_pos_per_kvhead, self.pruned_kv_counts)
-        #     vs_pos_grouped_per_head = self.repeat_kv_pruned(vs_per_kvhead, self.pruned_kv_counts)
+        if self.pruned_heads is None:
+            ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
+            vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
+        else:
+            ks_pos_grouped_per_head = self.repeat_kv_pruned(ks_pos_per_kvhead, self.pruned_kv_counts)
+            vs_pos_grouped_per_head = self.repeat_kv_pruned(vs_per_kvhead, self.pruned_kv_counts)
         
         causal_mask = attention_mask
         if attention_mask is not None:
@@ -195,8 +195,4 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         (batch, num_attention_heads, seqlen, head_dim)
         """
         # Repeat states along the 1st dimension (specific key_value_heads) according to `pruned_kv_counts`
-        batch, _, seq_len, head_dim = states_per_kvhead.shape
-        splits = states_per_kvhead.split(1, dim=1)
-        zipped = zip(splits, pruned_kv_counts)
-        repeated = tuple(map(lambda t: t[0].expand(batch, t[1], seq_len, head_dim), zipped))
-        return torch.cat(repeated, dim=1)
+        return states_per_kvhead.repeat_interleave(pruned_kv_counts, dim=1)

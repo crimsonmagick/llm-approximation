@@ -26,11 +26,22 @@ class TestRunner:
             prompts = [example["text"] for example in batch]
             tokens = self.llm.tokenize(prompts)
             self.llm.evaluate(tokens)
-            self.llm.per_token_losses(tokens)
+            # self.llm.per_token_losses(tokens)
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
 
 def main():
     model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
+    # print('--------------------------------')
+    # print('ORIGINAL')
+    # print('--------------------------------')
+    #
+    # runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
+    # runner.batch_evaluate(100)
+    
+    print('--------------------------------')
+    print('PRUNED')
+    print('--------------------------------')
+    
     pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
@@ -38,7 +49,7 @@ def main():
     pruner.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
-    runner.batch_evaluate(20)
+    runner.batch_evaluate(100)
 
 
 if __name__ == '__main__':
