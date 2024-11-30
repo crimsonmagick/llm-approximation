@@ -1,12 +1,9 @@
 import logging
-import gc
 
-import torch
+from datasets import load_dataset
 
 from large_language_model_service import get_model
-from src.pruning.attention_pruning import LlamaModelPruner
 from llm_type import LLMType
-from datasets import load_dataset
 
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
@@ -29,29 +26,29 @@ class TestRunner:
             prompts = [example["text"] for example in batch]
             tokens = self.llm.tokenize(prompts)
             self.llm.evaluate(tokens)
-            # self.llm.per_token_losses(tokens)
+            self.llm.per_token_losses(tokens)
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
 
 def main():
     model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
-    # print('--------------------------------')
-    # print('ORIGINAL')
-    # print('--------------------------------')
-    #
-    # runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
-    # runner.batch_evaluate(100)
-    #
-    # print('--------------------------------')
-    # print('PRUNED')
-    # print('--------------------------------')
+    print('--------------------------------')
+    print('ORIGINAL')
+    print('--------------------------------')
 
-    # heads = dict()
-    # for i in range(0, 32):
-    #     heads[i] = [0, 1, 2, 3]
-    # model.model.prune_heads(heads)
+    runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
+    runner.batch_evaluate(5, 1)
+
+    print('--------------------------------')
+    print('PRUNED')
+    print('--------------------------------')
+
+    heads = dict()
+    for i in range(0, 32):
+        heads[i] = [0, 1, 2, 3]
+    model.model.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
-    runner.batch_evaluate(100)
+    runner.batch_evaluate(5, 1)
 
 
 if __name__ == '__main__':

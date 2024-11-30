@@ -13,7 +13,7 @@ from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
 
-class LargeLanguageModel(ABC):
+class LargeLanguageModelFacade(ABC):
     
     def __init__(self, llm_type: LLMType, model, model_path: string, device: string):
         logging.basicConfig(level=logging.INFO, force=True)
@@ -76,7 +76,7 @@ class MissingParameterException(Exception):
         super().__init__(f'Missing parameter "{param_name}"')
 
 
-class LlamaLargeLanguageModel(LargeLanguageModel):
+class LlamaFacade(LargeLanguageModelFacade):
     
     def __init__(self, llm_type: LLMType, model_path: string, use_fast=True, device: string = "cuda"):
         self.model_path = model_path
@@ -86,7 +86,7 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
         self.device = device
         self.dtype = torch.bfloat16
         model = PrunedLlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
-        super(LlamaLargeLanguageModel, self).__init__(llm_type, model, model_path, device)
+        super(LlamaFacade, self).__init__(llm_type, model, model_path, device)
     
     def detokenize(self, tokens):
         return self.tokenizer.decode(tokens)
@@ -98,7 +98,7 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
     def vocab_size(self):
         return self.tokenizer.vocab_size
 
-class PrunedLargeLanguageModel(LargeLanguageModel):
+class TorchLlamaLoaderFacade(LargeLanguageModelFacade):
     def __init__(self, llm_type: LLMType, model_path: string, device: string = "cuda"):
         self.model_path = model_path
         self.device = device

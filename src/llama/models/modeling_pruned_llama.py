@@ -113,7 +113,6 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         return list(kv_counts.values())
     
     @staticmethod
-    @torch.no_grad()
     def prune_linear(to_prune: nn.Linear, keep_idxs, dim):
         # TODO add support for pruning biases (not needed with Llama 3 OOTB)
         pruned_weights = torch.index_select(to_prune.weight, dim, keep_idxs)
