@@ -1,5 +1,7 @@
+import gc
 import logging
 
+import torch
 from datasets import load_dataset
 
 from large_language_model_service import get_model
@@ -28,20 +30,25 @@ class TestRunner:
             self.llm.evaluate(tokens)
             self.llm.per_token_losses(tokens)
         logger.info(f'Vocab Size: {self.llm.vocab_size()}')
-
+        
 def main():
-    model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B')
+    model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B', False)
     print('--------------------------------')
     print('ORIGINAL')
     print('--------------------------------')
 
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
-    runner.batch_evaluate(5, 1)
+    runner.batch_evaluate(1, 1)
 
     print('--------------------------------')
     print('PRUNED')
     print('--------------------------------')
 
+    del model
+    del runner
+    gc.collect()
+    torch.cuda.empty_cache()
+    model = get_model(LLMType.LLAMA_3, 'meta-llama/Meta-Llama-3-8B', True)
     heads = dict()
     for i in range(0, 32):
         heads[i] = [0, 1, 2, 3]

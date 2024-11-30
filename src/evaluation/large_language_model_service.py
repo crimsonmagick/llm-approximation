@@ -9,12 +9,10 @@ class LlmMetricsFacade:
         self.source_llm = source_llm
 
 
-def get_model(llm_type: LLMType, path: string) -> LargeLanguageModelFacade:
+def get_model(llm_type: LLMType, path: string, pruned=False) -> LargeLanguageModelFacade:
     if llm_type == LLMType.LLAMA_2:
         return LlamaFacade(llm_type, path, False, device='cuda')
     elif llm_type == LLMType.LLAMA_3:
-        return LlamaFacade(llm_type, path, True, device='cuda')
-    elif llm_type == LLMType.PRUNED:
-        return TorchLlamaLoaderFacade(llm_type, path, device='cuda')
+        return LlamaFacade(llm_type, path, True, device='cuda', pruned=pruned)
     else:
         raise ValueError(f'Model type not supported, llm_type: {llm_type}')

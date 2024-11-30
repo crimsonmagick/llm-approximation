@@ -8,7 +8,7 @@ import torch.nn.functional as functional
 from llm_type import LLMType
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
 from src.metrics.metrics import capture_evaluation, capture_loss
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, LlamaForCausalLM
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
@@ -78,14 +78,17 @@ class MissingParameterException(Exception):
 
 class LlamaFacade(LargeLanguageModelFacade):
     
-    def __init__(self, llm_type: LLMType, model_path: string, use_fast=True, device: string = "cuda"):
+    def __init__(self, llm_type: LLMType, model_path: string, use_fast=True, device: string = "cuda", pruned=False):
         self.model_path = model_path
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=use_fast)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.device = device
         self.dtype = torch.bfloat16
-        model = PrunedLlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
+        if pruned:
+            model = PrunedLlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
+        else:
+            model = LlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
         super(LlamaFacade, self).__init__(llm_type, model, model_path, device)
     
     def detokenize(self, tokens):
