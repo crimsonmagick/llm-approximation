@@ -47,11 +47,10 @@ def main():
 
     print("Before pruning:")
     print(torch.cuda.memory_summary())
-    pruner = LlamaModelPruner(model.model)
     heads = dict()
     for i in range(0, 32):
         heads[i] = [0, 1, 2, 3]
-    pruner.prune_heads(heads)
+    model.model.prune_heads(heads)
     gc.collect()
     torch.cuda.empty_cache()
     print("After pruning:")

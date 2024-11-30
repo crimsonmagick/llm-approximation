@@ -1,18 +1,18 @@
-from itertools import zip_longest, chain
-
-from transformers.utils import logging
-
-from transformers import Cache, LlamaForCausalLM, PretrainedConfig, is_torch_xla_available, GenerationMixin, LlamaModel
-from transformers.models.llama.modeling_llama import LlamaSdpaAttention, apply_rotary_pos_emb, LLAMA_ATTENTION_CLASSES, \
-    LlamaPreTrainedModel, LlamaRMSNorm, LlamaRotaryEmbedding, LlamaDecoderLayer, LlamaMLP
-from transformers.models.llama.configuration_llama import LlamaConfig
+from itertools import chain
+from typing import List, Optional, Tuple, Dict
 
 import torch
 import torch.utils.checkpoint
 from torch import nn
-from typing import List, Optional, Tuple
+
+from transformers import Cache, LlamaForCausalLM, GenerationMixin, LlamaModel
+from transformers.models.llama.configuration_llama import LlamaConfig
+from transformers.models.llama.modeling_llama import LlamaSdpaAttention, apply_rotary_pos_emb, LLAMA_ATTENTION_CLASSES, \
+    LlamaPreTrainedModel, LlamaRMSNorm, LlamaRotaryEmbedding, LlamaDecoderLayer, LlamaMLP
+from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
+
 
 class PrunedLlamaForCausalLM(LlamaForCausalLM):
     
@@ -25,17 +25,13 @@ class PrunedLlamaForCausalLM(LlamaForCausalLM):
         
         # Initialize weights and apply final processing
         self.post_init()
-        
-class PrunedLlamaDecoderLayer(LlamaDecoderLayer):
-    def __init__(self, config: LlamaConfig, layer_idx: int):
-        nn.Module.__init__(self)
-        self.hidden_size = config.hidden_size
-        
-        self.self_attn = PrunedLlamaSdpaAttention(config=config, layer_idx=layer_idx)
-        
-        self.mlp = LlamaMLP(config)
-        self.input_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+    
+    def _prune_heads(self, heads_to_prune: Dict[int, List[int]]):
+        self.model._prune_heads(heads_to_prune)
+    
+    def prune_layers(self, layers):
+        self.model.prune_layers(layers)
+
 
 class PrunedLlamaModel(LlamaModel):
     
@@ -54,6 +50,28 @@ class PrunedLlamaModel(LlamaModel):
         
         # Initialize weights and apply final processing
         self.post_init()
+    
+    def _prune_heads(self, heads_to_prune: Dict[int, List[int]]):
+        for layer_idx, head_idxs in heads_to_prune.items():
+            transformer_block = self.layers[layer_idx]
+            llama_attention = transformer_block.self_attn
+            llama_attention.prune_heads(head_idxs)
+    
+    def prune_layers(self, layers):
+        for layer_idx in layers:
+            self.layers.pop(layer_idx)
+
+
+class PrunedLlamaDecoderLayer(LlamaDecoderLayer):
+    def __init__(self, config: LlamaConfig, layer_idx: int):
+        nn.Module.__init__(self)
+        self.hidden_size = config.hidden_size
+        
+        self.self_attn = PrunedLlamaSdpaAttention(config=config, layer_idx=layer_idx)
+        
+        self.mlp = LlamaMLP(config)
+        self.input_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.post_attention_layernorm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
 
 class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
@@ -68,11 +86,11 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
                                  device=self.q_proj.weight.device)
         keep_kv_heads = self.get_keep_kv_heads(keep_heads, self.num_key_value_groups)
         keep_kv_idxs = torch.tensor(self.get_keep_indices(keep_kv_heads, self.head_dim),
-                                      dtype=torch.long,
-                                      device=self.q_proj.weight.device)
+                                    dtype=torch.long,
+                                    device=self.q_proj.weight.device)
         self.register_buffer('pruned_kv_counts',
-                              torch.tensor(self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups),
-                                           dtype=torch.long, device=self.q_proj.weight.device), False)
+                             torch.tensor(self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups),
+                                          dtype=torch.long, device=self.q_proj.weight.device), False)
         self.num_key_value_groups = max(self.pruned_kv_counts).item()
         self.prune_linear(self.q_proj, keep_idxs, 0)
         self.prune_linear(self.o_proj, keep_idxs, 1)
@@ -227,5 +245,6 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         """
         # Repeat states along the 1st dimension (specific key_value_heads) according to `pruned_kv_counts`
         return states_per_kvhead.repeat_interleave(pruned_kv_counts, dim=1)
+
 
 LLAMA_ATTENTION_CLASSES['sdpa_pruned'] = PrunedLlamaSdpaAttention

@@ -20,13 +20,6 @@ class LlamaModelPruner:
             llama_attention = transformer_block.self_attn
             llama_attention.prune_heads(head_idxs)
 
-            referrers = gc.get_referrers(llama_attention)
-            print('any params in grad graph?')
-            for param in llama_attention.parameters():
-                print(param.grad_fn)
-            print(f"References to llama_attention: {len(referrers)}")
-            for ref in referrers:
-                print(type(ref), ref)
             
     @torch.no_grad()
     def prune_layers(self, layers):
