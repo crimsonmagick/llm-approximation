@@ -78,6 +78,9 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int):
         super().__init__(config, layer_idx)
         self.pruned_heads = list()
+        self.register_buffer('pruned_kv_counts',
+                             torch.full((self.num_key_value_heads,),
+                                        self.num_key_value_groups, dtype=torch.long), False)
     
     def prune_heads(self, prune_heads: List[int]):
         self.pruned_heads = sorted(prune_heads) if prune_heads is not None else prune_heads
@@ -85,12 +88,11 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         keep_idxs = torch.tensor(self.get_keep_indices(keep_heads, self.head_dim), dtype=torch.long,
                                  device=self.q_proj.weight.device)
         keep_kv_heads = self.get_keep_kv_heads(keep_heads, self.num_key_value_groups)
-        keep_kv_idxs = torch.tensor(self.get_keep_indices(keep_kv_heads, self.head_dim),
-                                    dtype=torch.long,
+        keep_kv_idxs = torch.tensor(self.get_keep_indices(keep_kv_heads, self.head_dim), dtype=torch.long,
                                     device=self.q_proj.weight.device)
-        self.register_buffer('pruned_kv_counts',
-                             torch.tensor(self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups),
-                                          dtype=torch.long, device=self.q_proj.weight.device), False)
+        self.pruned_kv_counts.data = torch.tensor(
+            self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups), dtype=torch.long,
+            device=self.pruned_kv_counts.device)
         self.num_key_value_groups = max(self.pruned_kv_counts).item()
         self.prune_linear(self.q_proj, keep_idxs, 0)
         self.prune_linear(self.o_proj, keep_idxs, 1)
@@ -182,13 +184,9 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
             ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx,
                                                                      cache_kwargs)
-        
-        if self.pruned_heads is None:
-            ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.num_key_value_groups)
-            vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.num_key_value_groups)
-        else:
-            ks_pos_grouped_per_head = self.repeat_kv_pruned(ks_pos_per_kvhead, self.pruned_kv_counts)
-            vs_pos_grouped_per_head = self.repeat_kv_pruned(vs_per_kvhead, self.pruned_kv_counts)
+
+        ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.pruned_kv_counts)
+        vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.pruned_kv_counts)
         
         causal_mask = attention_mask
         if attention_mask is not None:
@@ -226,19 +224,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         return attn_projected, None, past_key_value
     
     @staticmethod
-    def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
-        """
-        This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
-        num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
-        """
-        batch, num_key_value_heads, slen, head_dim = hidden_states.shape
-        if n_rep == 1:
-            return hidden_states
-        hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
-        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
-    
-    @staticmethod
-    def repeat_kv_pruned(states_per_kvhead: torch.Tensor, pruned_kv_counts) -> torch.Tensor:
+    def repeat_kv(states_per_kvhead: torch.Tensor, pruned_kv_counts) -> torch.Tensor:
         """
         The hidden states go from (batch, num_key_value_heads, seqlen, head_dim) to
         (batch, num_attention_heads, seqlen, head_dim)

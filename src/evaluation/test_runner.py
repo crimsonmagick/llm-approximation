@@ -45,16 +45,10 @@ def main():
     # print('PRUNED')
     # print('--------------------------------')
 
-    print("Before pruning:")
-    print(torch.cuda.memory_summary())
-    heads = dict()
-    for i in range(0, 32):
-        heads[i] = [0, 1, 2, 3]
-    model.model.prune_heads(heads)
-    gc.collect()
-    torch.cuda.empty_cache()
-    print("After pruning:")
-    print(torch.cuda.memory_summary())
+    # heads = dict()
+    # for i in range(0, 32):
+    #     heads[i] = [0, 1, 2, 3]
+    # model.model.prune_heads(heads)
     
     runner = TestRunner(model, ("Salesforce/wikitext", 'wikitext-2-v1'))
     runner.batch_evaluate(100)

@@ -1,3 +1,4 @@
+from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
 from src.pruning.attention_pruning import LlamaModelPruner
 from transformers import AutoTokenizer, LlamaForCausalLM
 
@@ -5,14 +6,13 @@ import torch
 
 model_name = 'meta-llama/Meta-Llama-3-8B'
 # torch.manual_seed(633)
-model = LlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
+model = PrunedLlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
 print(model)
-pruner = LlamaModelPruner(model)
 heads = dict()
 for i in range(16, 19):
     # heads[i] = list(range(0, 32))
     heads[i] = [5]
-pruner.prune_heads(heads)
+model.prune_heads(heads)
 
 print('-------------------------------------------------------------------')
 print('-------------------------------------------------------------------')

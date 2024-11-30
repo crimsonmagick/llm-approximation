@@ -27,7 +27,7 @@ class TestRepeatKvPruned(unittest.TestCase):
         states_per_kv_head = torch.randn(self.batch_size, num_key_value_heads, self.seq_len, self.head_dim)
         
         expected_repeat_kv = repeat_kv(states_per_kv_head, n_rep)
-        under_test_repeat_kv = PrunedLlamaSdpaAttention.repeat_kv_pruned(states_per_kv_head, uniform_kv_counts)
+        under_test_repeat_kv = PrunedLlamaSdpaAttention.repeat_kv(states_per_kv_head, uniform_kv_counts)
         
         self.assertEqual((self.batch_size, num_key_value_heads * n_rep, self.seq_len, self.head_dim),
                          under_test_repeat_kv.shape, "Repeated Key-Values Shape mismatch")
@@ -43,7 +43,7 @@ class TestRepeatKvPruned(unittest.TestCase):
         expected_repeated_kv = self.get_expected_repeated_kv(states_per_kvhead, pruned_kv_counts)
         expected_repeated_count = sum(pruned_kv_counts)
         
-        under_test_repeated_kv = PrunedLlamaSdpaAttention.repeat_kv_pruned(states_per_kvhead, pruned_kv_counts)
+        under_test_repeated_kv = PrunedLlamaSdpaAttention.repeat_kv(states_per_kvhead, pruned_kv_counts)
         
         self.assertEqual((self.batch_size, expected_repeated_count, self.seq_len, self.head_dim),
                          under_test_repeated_kv.shape, "Repeated Key-Values Shape mismatch")
