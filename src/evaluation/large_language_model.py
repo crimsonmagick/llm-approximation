@@ -6,8 +6,9 @@ import torch
 import torch.nn.functional as functional
 
 from llm_type import LLMType
+from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
 from src.metrics.metrics import capture_evaluation, capture_loss
-from transformers import AutoTokenizer, LlamaForCausalLM
+from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
@@ -84,7 +85,7 @@ class LlamaLargeLanguageModel(LargeLanguageModel):
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.device = device
         self.dtype = torch.bfloat16
-        model = LlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
+        model = PrunedLlamaForCausalLM.from_pretrained(model_path, torch_dtype=self.dtype, device_map=self.device)
         super(LlamaLargeLanguageModel, self).__init__(llm_type, model, model_path, device)
     
     def detokenize(self, tokens):
