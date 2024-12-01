@@ -183,7 +183,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
             ks_pos_per_kvhead, vs_per_kvhead = past_key_value.update(ks_pos_per_kvhead, vs_per_kvhead, self.layer_idx,
                                                                      cache_kwargs)
-
+        
         ks_pos_grouped_per_head = self.repeat_kv(ks_pos_per_kvhead, self.pruned_kv_counts)
         vs_pos_grouped_per_head = self.repeat_kv(vs_per_kvhead, self.pruned_kv_counts)
         
@@ -230,6 +230,3 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         """
         # Repeat states along the 1st dimension (specific key_value_heads) according to `pruned_kv_counts`
         return states_per_kvhead.repeat_interleave(pruned_kv_counts, dim=1)
-
-
-LLAMA_ATTENTION_CLASSES['sdpa_pruned'] = PrunedLlamaSdpaAttention
