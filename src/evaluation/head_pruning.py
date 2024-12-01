@@ -51,6 +51,9 @@ class HeadPruningTester:
         metrics_manager().save_metrics(test_case)
         return self
     
+    def num_layers(self):
+        return self.transformer.model.config.num_hidden_layers
+    
     def num_attention_heads(self):
         return self.transformer.model.config.num_attention_heads
     
@@ -76,10 +79,17 @@ def run_tests(batch_size: int, evaluation_row_count: int):
         .transformer_under_test(transformer_type, model_path, True) \
         .run_test('baseline')
     
-    tester \
-        .transformer_under_test(transformer_type, model_path, True) \
-        .prune_heads(4, [8]) \
-        .run_test('pruned')
+    num_heads =  tester.num_attention_heads()
+    num_layers = tester.num_layers()
+    
+    for layer in range(num_layers):
+        # prune all heads, then ever other head
+        tester.transformer_under_test(transformer_type, model_path, True) \
+            .prune_heads(layer, list(range(num_heads))) \
+            .run_test(f'pruned-{layer}-all') \
+            .transformer_under_test(transformer_type, model_path, True) \
+            .prune_heads(layer, list(range(0, num_heads, 2))) \
+            .run_test(f'pruned-{layer}-every-other')
 
 
 def write_to_csv(output_path: str):

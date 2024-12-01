@@ -93,7 +93,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         self.pruned_kv_counts.data = torch.tensor(
             self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups), dtype=torch.long,
             device=self.pruned_kv_counts.device)
-        self.num_key_value_groups = max(self.pruned_kv_counts).item()
+        self.num_key_value_groups = 0 if self.pruned_kv_counts.numel() == 0 else max(self.pruned_kv_counts).item()
         self.prune_linear(self.q_proj, keep_idxs, 0)
         self.prune_linear(self.o_proj, keep_idxs, 1)
         self.num_heads = self.num_heads - len(self.pruned_heads)
@@ -202,7 +202,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         # in SDPA to support both torch.compile's dynamic shapes and full graph options. An inline conditional prevents dynamic shapes from compiling.
         is_causal = True if causal_mask is None and q_len > 1 else False
         
-        if torch.numel(qs_pos_per_attnhead) != 0:
+        if self.num_key_value_groups != 0:
             
             attn_output_per_attnhead = torch.nn.functional.scaled_dot_product_attention(
                 qs_pos_per_attnhead,
