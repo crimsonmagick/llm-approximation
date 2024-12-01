@@ -51,6 +51,13 @@ class HeadPruningTester:
         metrics_manager().save_metrics(test_case)
         return self
     
+    def num_attention_heads(self):
+        return self.transformer.model.config.num_attention_heads
+    
+    def num_key_value_groups(self):
+        config = self.transformer.model.config
+        return config.num_attention_heads // config.num_key_value_heads
+    
     def transformer_under_test(self, model_type, model_path: string, supports_pruning: bool):
         del self.transformer
         self.supports_pruning = supports_pruning
@@ -65,9 +72,11 @@ def run_tests(batch_size: int, evaluation_row_count: int):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     model_path: Final[str] = 'meta-llama/Meta-Llama-3-8B'
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
-    HeadPruningTester(dataset, batch_size, evaluation_row_count) \
+    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count) \
         .transformer_under_test(transformer_type, model_path, True) \
-        .run_test('unpruned') \
+        .run_test('baseline')
+    
+    tester \
         .transformer_under_test(transformer_type, model_path, True) \
         .prune_heads(4, [8]) \
         .run_test('pruned')
