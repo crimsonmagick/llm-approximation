@@ -40,7 +40,6 @@ class LargeLanguageModelFacade(ABC):
     def evaluate(self, tokens, max_length=500):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
-        labels = input_ids.clone()
         
         with torch.no_grad():
             evaluation = self.model.generate(
@@ -52,7 +51,7 @@ class LargeLanguageModelFacade(ABC):
                 top_p=0.95,
                 temperature=1.0,
             )
-        return evaluation[0], evaluation.shape[1]
+        return evaluation[0], evaluation.shape[0] * evaluation.shape[1]
     
     @capture_loss
     def per_token_losses(self, tokens):

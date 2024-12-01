@@ -5,6 +5,7 @@ import os
 import string
 from typing import Final
 
+import torch
 from datasets import load_dataset
 
 from large_language_model_service import get_model
@@ -14,6 +15,7 @@ from src.metrics.metrics import metrics_manager
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
+torch.manual_seed(633)
 
 class HeadPruningTester:
     

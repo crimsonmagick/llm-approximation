@@ -68,8 +68,8 @@ class MetricsManager:
         self._layer_idx = layer_idx
         return self
     
-    def head_idxs(self, header_idxs):
-        self._head_idxs = header_idxs
+    def head_idxs(self, head_idxs):
+        self._head_idxs = head_idxs
         return self
     
     def save_metrics(self, label):
@@ -135,10 +135,6 @@ def capture_evaluation(func):
             self.energy_usage_mj = 0
         
         def capture(self, *args, **kwargs):
-            token_sequences: tensor = args[0]['input_ids']
-            for sequence in token_sequences:
-                self.token_count += len(sequence)
-            
             recorder = EnergyRecorder().start()
             evaluation = self.func(self.instance, *args, **kwargs)
             energy_usage_mj, execution_time_ms = recorder.end().get_metrics()
@@ -158,7 +154,6 @@ def capture_evaluation(func):
             logger.debug(f"Reserved Memory: {torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
             metrics_manager() \
                 .execution_time_ms(self.execution_time_ms) \
-                .average_time_per_token_ms(self.energy_usage_mj) \
                 .total_energy(self.energy_usage_mj) \
                 .average_time_per_token_ms(average_time_per_token_ms) \
                 .average_energy_per_token_mj(average_energy_per_token_mj) \
