@@ -82,7 +82,8 @@ def run_tests(batch_size: int, evaluation_row_count: int):
     num_heads =  tester.num_attention_heads()
     num_layers = tester.num_layers()
     
-    for layer in range(num_layers):
+    # for layer in range(num_layers):
+    for layer in [7, 8]:
         # prune all heads, then ever other head
         tester.transformer_under_test(transformer_type, model_path, True) \
             .prune_heads(layer, list(range(num_heads))) \

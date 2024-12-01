@@ -126,20 +126,21 @@ class EnergyRecorder:
 
 def capture_evaluation(func):
     class CaptureEvaluation:
-        def __init__(self):
+        def __init__(self, instance):
             self.token_count = 0
             self.execution_time_ms = 0
             self.batch_count = 0
             self.func = func
+            self.instance = instance
             self.energy_usage_mj = 0
         
         def capture(self, *args, **kwargs):
-            token_sequences: tensor = args[1]['input_ids']
+            token_sequences: tensor = args[0]['input_ids']
             for sequence in token_sequences:
                 self.token_count += len(sequence)
             
             recorder = EnergyRecorder().start()
-            evaluation = self.func(*args, **kwargs)
+            evaluation = self.func(self.instance, *args, **kwargs)
             energy_usage_mj, execution_time_ms = recorder.end().get_metrics()
             self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
@@ -147,10 +148,10 @@ def capture_evaluation(func):
             self.batch_count += 1
             average_time_per_token_ms = self.execution_time_ms / self.token_count
             average_energy_per_token_mj = self.energy_usage_mj / self.token_count
-            logger.debug(
+            logger.info(
                 f"batch_count={self.batch_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
                 f"energy_usage={self.energy_usage_mj / 1000:.2f} j")
-            logger.debug(
+            logger.info(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
                 f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} j")
             logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
@@ -165,28 +166,40 @@ def capture_evaluation(func):
             
             return evaluation
     
-    capture = CaptureEvaluation()
-    return lambda *args, **kwargs: capture.capture(*args, **kwargs)
+    def wrapper(self, *args, **kwargs):
+        # Lazily create a CaptureEvaluation instance if it doesn't exist
+        if not hasattr(self, '_capture_evaluation'):
+            self._capture_evaluation = CaptureEvaluation(self)
+        
+        return self._capture_evaluation.capture(*args, **kwargs)
+    
+    return wrapper
 
 
 def capture_loss(func):
     class CaptureLoss:
-        def __init__(self, func):
+        def __init__(self, instance):
             self.token_count = 0
             self.aggregate_loss = 0
-            self.func = func
+            self.instance = instance
         
         def capture(self, *args, **kwargs):
-            token_sequences: tensor = args[1]['input_ids']
+            token_sequences: tensor = args[0]['input_ids']
             for sequence in token_sequences:
                 self.token_count += len(
                     sequence) - 1  # can't count first token, is not generated as a part of evaluation
-            token_losses = self.func(*args, **kwargs)
+            token_losses = func(self.instance, *args, **kwargs)
             self.aggregate_loss += token_losses.sum()
             perplexity = self.aggregate_loss / self.token_count
             logger.info(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
             return token_losses
     
-    capture = CaptureLoss(func)
-    return lambda *args, **kwargs: capture.capture(*args, **kwargs)
+    def wrapper(self, *args, **kwargs):
+        # Lazily create a CaptureLoss instance if it doesn't exist
+        if not hasattr(self, '_capture_loss'):
+            self._capture_loss = CaptureLoss(self)
+        
+        return self._capture_loss.capture(*args, **kwargs)
+    
+    return wrapper

@@ -1,5 +1,4 @@
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
-from src.pruning.attention_pruning import LlamaModelPruner
 from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
