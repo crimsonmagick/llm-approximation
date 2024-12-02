@@ -1,7 +1,6 @@
 import argparse
 import csv
 import matplotlib.pyplot as plt
-import math
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generates graphs of Llama model testing.")
@@ -30,9 +29,9 @@ if __name__ == '__main__':
             else:
                 perplexity_sum_by_layer[layer_idx] = float(row['perplexity'])
         for p in perplexity_sum_by_layer.values():
-            perplexities.append((baseline_perplexity / p ))
+            perplexities.append((baseline_perplexity / p ) * 100)
         plt.plot(perplexities)
-        plt.title("Per Layer Sensitivity to Attention Head Pruning")
-        plt.xlabel("Layer")
-        plt.ylabel("Sensitivity")
+        plt.title("Per Layer Accuracy After Attention Head Pruning")
+        plt.xlabel("Layer Index")
+        plt.ylabel("Accuracy (Percent)")
         plt.show()
