@@ -1,5 +1,7 @@
 import argparse
 import csv
+import matplotlib.pyplot as plt
+import math
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generates graphs of Llama model testing.")
@@ -17,5 +19,20 @@ if __name__ == '__main__':
     
     with open(args.input_path, mode='r') as file:
         reader = csv.DictReader(file)
+        baseline = next(reader)
+        baseline_perplexity = float(baseline['perplexity'])
+        perplexity_sum_by_layer = dict()
+        perplexities = []
         for row in reader:
-            print(row)
+            layer_idx = row['layer_idx']
+            if layer_idx in perplexity_sum_by_layer:
+                perplexity_sum_by_layer[layer_idx] = (perplexity_sum_by_layer[layer_idx] + float(row['perplexity'])) / 2
+            else:
+                perplexity_sum_by_layer[layer_idx] = float(row['perplexity'])
+        for p in perplexity_sum_by_layer.values():
+            perplexities.append((baseline_perplexity / p ))
+        plt.plot(perplexities)
+        plt.title("Per Layer Sensitivity to Attention Head Pruning")
+        plt.xlabel("Layer")
+        plt.ylabel("Sensitivity")
+        plt.show()
