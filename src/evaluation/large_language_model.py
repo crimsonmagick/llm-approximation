@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn.functional as functional
+from sympy.physics.units import temperature
 
 from llm_type import LLMType
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
@@ -45,11 +46,10 @@ class LargeLanguageModelFacade(ABC):
             evaluation = self.model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                do_sample=True,
-                top_k=50,
+                do_sample=False,
                 max_length=max_length,
-                top_p=0.95,
-                temperature=1.0,
+                temperature=None,
+                top_p=None,
             )
         return evaluation[0], evaluation.shape[0] * evaluation.shape[1]
     

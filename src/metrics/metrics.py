@@ -125,6 +125,7 @@ class EnergyRecorder:
 
 
 def capture_evaluation(func):
+    energy_recorder = EnergyRecorder()
     class CaptureEvaluation:
         def __init__(self, instance):
             self.token_count = 0
@@ -135,19 +136,19 @@ def capture_evaluation(func):
             self.energy_usage_mj = 0
         
         def capture(self, *args, **kwargs):
-            recorder = EnergyRecorder().start()
+            energy_recorder.start()
             evaluation = self.func(self.instance, *args, **kwargs)
-            energy_usage_mj, execution_time_ms = recorder.end().get_metrics()
+            energy_usage_mj, execution_time_ms = energy_recorder.end().get_metrics()
             self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
             self.batch_count += 1
             average_time_per_token_ms = self.execution_time_ms / self.token_count
             average_energy_per_token_mj = self.energy_usage_mj / self.token_count
-            logger.info(
+            logger.debug(
                 f"batch_count={self.batch_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
                 f"energy_usage={self.energy_usage_mj / 1000:.2f} j")
-            logger.info(
+            logger.debug(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
                 f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} j")
             logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
@@ -186,7 +187,7 @@ def capture_loss(func):
             token_losses = func(self.instance, *args, **kwargs)
             self.aggregate_loss += token_losses.sum()
             perplexity = self.aggregate_loss / self.token_count
-            logger.info(f'Perplexity: {perplexity}')
+            logger.debug(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
             return token_losses
     

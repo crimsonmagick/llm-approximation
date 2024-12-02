@@ -1,5 +1,6 @@
 import argparse
 import csv
+import gc
 import logging
 import os
 import string
@@ -16,6 +17,7 @@ logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
 torch.manual_seed(633)
+
 
 class HeadPruningTester:
     
@@ -77,22 +79,34 @@ def run_tests(batch_size: int, evaluation_row_count: int):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     model_path: Final[str] = 'meta-llama/Meta-Llama-3-8B'
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
-    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count) \
-        .transformer_under_test(transformer_type, model_path, True) \
+    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+    tester.transformer_under_test(transformer_type, model_path, True) \
         .run_test('baseline')
     
-    num_heads =  tester.num_attention_heads()
+    num_heads = tester.num_attention_heads()
     num_layers = tester.num_layers()
     
-    # for layer in range(num_layers):
-    for layer in [7, 8]:
+    for layer in range(num_layers):
         # prune all heads, then ever other head
-        tester.transformer_under_test(transformer_type, model_path, True) \
+        logger.info(f"Evaluating all heads pruned for layer={layer}")
+        clear_memory()
+        tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+        tester.transformer_under_test(transformer_type, model_path,
+                                      True) \
             .prune_heads(layer, list(range(num_heads))) \
-            .run_test(f'pruned-{layer}-all') \
-            .transformer_under_test(transformer_type, model_path, True) \
+            .run_test(f'pruned-{layer}-all')
+        
+        logger.info(f"Evaluating every other head pruned for layer={layer}")
+        clear_memory()
+        tester.transformer_under_test(transformer_type, model_path, True) \
             .prune_heads(layer, list(range(0, num_heads, 2))) \
             .run_test(f'pruned-{layer}-every-other')
+
+
+def clear_memory():
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
 
 
 def write_to_csv(output_path: str):
