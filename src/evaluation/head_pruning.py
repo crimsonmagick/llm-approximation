@@ -75,7 +75,7 @@ class HeadPruningTester:
         return self
 
 
-def run_tests(batch_size: int, evaluation_row_count: int):
+def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     model_path: Final[str] = 'meta-llama/Meta-Llama-3-8B'
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
@@ -86,7 +86,8 @@ def run_tests(batch_size: int, evaluation_row_count: int):
     num_heads = tester.num_attention_heads()
     num_layers = tester.num_layers()
     
-    for layer in range(num_layers):
+    layers = range(num_layers - 1, -1, -1) if reverse_eval else range(num_layers)
+    for layer in layers:
         # prune all heads, then ever other head
         logger.info(f"Evaluating all heads pruned for layer={layer}")
         clear_memory()
@@ -136,6 +137,13 @@ if __name__ == '__main__':
         default=1,
         help='Optional batch size for dataset evaluation. Defaults to 1.'
     )
+    parser.add_argument(
+        '--reverse-eval',
+        type=bool,
+        default=False,
+        help='Optional toggle for testing layers in reverse order. Defaults to False.'
+    )
     args = parser.parse_args()
-    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows)
+    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+              reverse_eval=args.reverse_eval)
     write_to_csv(args.output_path)
