@@ -75,9 +75,8 @@ class HeadPruningTester:
         return self
 
 
-def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False):
+def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, model_path='meta-llama/Meta-Llama-3-8B'):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
-    model_path: Final[str] = 'meta-llama/Meta-Llama-3-8B'
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
     tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
     tester.transformer_under_test(transformer_type, model_path, True) \
@@ -132,6 +131,12 @@ if __name__ == '__main__':
         help='Optional batch size for dataset evaluation. Defaults to 1.'
     )
     parser.add_argument(
+        '--model-path',
+        type=str,
+        default='meta-llama/Meta-Llama-3-8B',
+        help='Path param for the model under test.  Defaults to meta-llama/Meta-Llama-3-8B'
+    )
+    parser.add_argument(
         '--eval-rows',
         type=int,
         default=1,
@@ -145,5 +150,5 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              reverse_eval=args.reverse_eval)
+              reverse_eval=args.reverse_eval, model_path=args.model_path)
     write_to_csv(args.output_path)
