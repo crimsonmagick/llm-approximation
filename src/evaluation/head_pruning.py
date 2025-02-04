@@ -140,7 +140,7 @@ if __name__ == '__main__':
         '--eval-rows',
         type=int,
         default=1,
-        help='Optional batch size for dataset evaluation. Defaults to 1.'
+        help='Number of rows of the dataset to evaluate. Defaults to 1.'
     )
     parser.add_argument(
         '--reverse-eval',

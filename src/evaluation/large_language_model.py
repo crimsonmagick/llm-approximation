@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn.functional as functional
-from sympy.physics.units import temperature
 
 from llm_type import LLMType
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
