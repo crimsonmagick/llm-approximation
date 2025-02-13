@@ -83,7 +83,8 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, mo
         .run_test('baseline')
     
     num_heads = tester.num_attention_heads()
-    num_layers = tester.num_layers()
+    # num_layers = tester.num_layers()
+    num_layers = 6
     
     layers = range(num_layers - 1, -1, -1) if reverse_eval else range(num_layers)
     for layer in layers:
