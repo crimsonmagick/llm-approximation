@@ -75,7 +75,8 @@ class HeadPruningTester:
         return self
 
 
-def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, model_path='meta-llama/Meta-Llama-3-8B'):
+def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
+              model_path='meta-llama/Meta-Llama-3-8B', layer_range=None):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
     tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
@@ -83,10 +84,19 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, mo
         .run_test('baseline')
     
     num_heads = tester.num_attention_heads()
-    # num_layers = tester.num_layers()
-    num_layers = 6
+    if layer_range is not None:
+        first_layer, final_layer = layer_range
+    else:
+        first_layer = 0
+        final_layer = tester.num_layers() - 1
     
-    layers = range(num_layers - 1, -1, -1) if reverse_eval else range(num_layers)
+    if (final_layer <= first_layer
+            or final_layer - first_layer > tester.num_layers()
+            or final_layer < 0 or first_layer < 0):
+        error_message = f"Invalid layer range specified: {layer_range}, model layer_range={tester.num_layers()}"
+        raise Exception(error_message)
+    
+    layers = range(final_layer, first_layer - 1, -1) if reverse_eval else range(first_layer, final_layer + 1)
     for layer in layers:
         # prune all heads, then ever other head
         logger.info(f"Evaluating all heads pruned for layer={layer}")
@@ -149,7 +159,18 @@ if __name__ == '__main__':
         default=False,
         help='Optional toggle for testing layers in reverse order. Defaults to False.'
     )
+    parser.add_argument(
+        '--layer-range',
+        type=str,
+        help='Range of layers to evaluate'
+    )
     args = parser.parse_args()
+    if args.layer_range is not None:
+        arg_range = args.layer_range.split('-')
+        layer_range = (int(arg_range[0]), int(arg_range[1]))
+    else:
+        layer_range = None
+    
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              reverse_eval=args.reverse_eval, model_path=args.model_path)
+              reverse_eval=args.reverse_eval, model_path=args.model_path, layer_range=layer_range)
     write_to_csv(args.output_path)
