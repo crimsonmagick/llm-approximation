@@ -39,7 +39,10 @@ class MetricsManager:
         self._allocated_memory = None
         self._layer_idx = None
         self._head_idxs = None
-    
+
+    def clear_saved(self):
+        self._saved_metrics = dict()
+
     def perplexity(self, perplexity):
         self._perplexity = perplexity
         return self
