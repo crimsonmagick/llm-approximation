@@ -178,11 +178,11 @@ if __name__ == '__main__':
 
   # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
   #           reverse_eval=args.reverse_eval, model_path=args.model_path, layer_range=layer_range)
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range)
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  metrics_manager().clear_saved()
+  # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+  #           model_path=args.model_path, layer_range=layer_range)
+  # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+  #           model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+  # metrics_manager().clear_saved()
 
   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
             model_path=args.model_path, layer_range=layer_range)
