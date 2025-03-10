@@ -177,17 +177,20 @@ if __name__ == '__main__':
     layer_range = None
 
   # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-  #           reverse_eval=args.reverse_eval, model_path=args.model_path, layer_range=layer_range)
-  # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
   #           model_path=args.model_path, layer_range=layer_range)
+  # write_to_csv(args.output_path + '-forward.csv')
+  # metrics_manager().clear_saved()
   # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
   #           model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  # metrics_manager().clear_saved()
+  # write_to_csv(args.output_path + '-reverse.csv')
 
   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
             model_path=args.model_path, layer_range=layer_range)
-  write_to_csv(args.output_path + '-forward.csv')
+  write_to_csv(args.output_path + '-forward1.csv')
   metrics_manager().clear_saved()
   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  write_to_csv(args.output_path + '-reverse.csv')
+            model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
+  write_to_csv(args.output_path + '-forward2.csv')
+  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+            model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
+  write_to_csv(args.output_path + '-forward3.csv')
