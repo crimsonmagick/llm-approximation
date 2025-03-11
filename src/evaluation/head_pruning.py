@@ -184,13 +184,12 @@ if __name__ == '__main__':
   #           model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
   # write_to_csv(args.output_path + '-reverse.csv')
 
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range)
-  write_to_csv(args.output_path + '-forward1.csv')
-  metrics_manager().clear_saved()
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
-  write_to_csv(args.output_path + '-forward2.csv')
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
-  write_to_csv(args.output_path + '-forward3.csv')
+  for idx in range(1, 4):
+    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+              model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
+    write_to_csv(args.output_path + f'-forward-{idx}.csv')
+    metrics_manager().clear_saved()
+    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+              model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+    write_to_csv(args.output_path + f'-reverse-{idx}.csv')
+    metrics_manager().clear_saved()
