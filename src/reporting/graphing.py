@@ -43,6 +43,7 @@ if __name__ == '__main__':
         energy_per_token = []
         time_per_token = []
         memory_allocated = []
+        measurements_per_layer = 6
 
         for row in reader:
             layer_idx = row['layer_idx']
@@ -52,31 +53,31 @@ if __name__ == '__main__':
             test_memory = int(row['allocated_memory'])
 
             if layer_idx in perplexity_sum_by_layer:
-                perplexity_sum_by_layer[layer_idx] = (perplexity_sum_by_layer[layer_idx] + test_perplexity) / 2
+                perplexity_sum_by_layer[layer_idx] = perplexity_sum_by_layer[layer_idx] + test_perplexity
             else:
                 perplexity_sum_by_layer[layer_idx] = test_perplexity
 
             if layer_idx in energy_sum_by_layer:
-                energy_sum_by_layer[layer_idx] = (energy_sum_by_layer[layer_idx] + test_energy) / 2
+                energy_sum_by_layer[layer_idx] = energy_sum_by_layer[layer_idx] + test_energy
             else:
                 energy_sum_by_layer[layer_idx] = test_energy
 
             if layer_idx in time_sum_by_layer:
-                time_sum_by_layer[layer_idx] = (time_sum_by_layer[layer_idx] + test_time) / 2
+                time_sum_by_layer[layer_idx] = time_sum_by_layer[layer_idx] + test_time
             else:
                 time_sum_by_layer[layer_idx] = test_time
 
             if layer_idx in memory_sum_by_layer:
-                memory_sum_by_layer[layer_idx] = (memory_sum_by_layer[layer_idx] + test_memory) // 2
+                memory_sum_by_layer[layer_idx] = memory_sum_by_layer[layer_idx] + test_memory
             else:
                 memory_sum_by_layer[layer_idx] = test_memory
 
         # Normalize and store final values
         for layer_idx in sorted(perplexity_sum_by_layer.keys(), key=lambda x: int(x)):
-            perplexities.append((baseline_perplexity / perplexity_sum_by_layer[layer_idx]) * 100)
-            energy_per_token.append((energy_sum_by_layer[layer_idx]) / baseline_energy  * 100)
-            time_per_token.append((time_sum_by_layer[layer_idx] / baseline_time) * 100)
-            memory_allocated.append((memory_sum_by_layer[layer_idx] / baseline_memory) * 100)
+            perplexities.append((baseline_perplexity / perplexity_sum_by_layer[layer_idx] / measurements_per_layer) * 100)
+            energy_per_token.append((energy_sum_by_layer[layer_idx] / baseline_energy / measurements_per_layer)* 100)
+            time_per_token.append((time_sum_by_layer[layer_idx] / baseline_time / measurements_per_layer) * 100)
+            memory_allocated.append((memory_sum_by_layer[layer_idx] / baseline_memory / 2) * 100)
 
         # Create dataframes for the tables
         layers = list(sorted(perplexity_sum_by_layer.keys(), key=lambda x: int(x)))

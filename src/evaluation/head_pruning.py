@@ -103,19 +103,20 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
     first_layer, final_layer + 1)
   for layer in layers:
     # prune all heads, then ever other head
-    logger.info(f"Evaluating all heads pruned for layer={layer}")
-    clear_memory()
-    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-    tester.transformer_under_test(transformer_type, model_path,
-                                  True) \
-      .prune_heads(layer, list(range(num_heads))) \
-      .run_test(f'pruned-{layer}-all')
+    for run in range(3):
+      logger.info(f"Evaluating all heads pruned for layer={layer}, run={run}")
+      clear_memory()
+      tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+      tester.transformer_under_test(transformer_type, model_path,
+                                    True) \
+        .prune_heads(layer, list(range(num_heads))) \
+        .run_test(f'pruned-{layer}-all-{run}')
 
-    logger.info(f"Evaluating every other head pruned for layer={layer}")
-    clear_memory()
-    tester.transformer_under_test(transformer_type, model_path, True) \
-      .prune_heads(layer, list(range(0, num_heads, 2))) \
-      .run_test(f'pruned-{layer}-every-other')
+      logger.info(f"Evaluating every other head pruned for layer={layer}, run={run}")
+      clear_memory()
+      tester.transformer_under_test(transformer_type, model_path, True) \
+        .prune_heads(layer, list(range(0, num_heads, 2))) \
+        .run_test(f'pruned-{layer}-every-other-{run}')
 
 
 def clear_memory():
@@ -176,20 +177,20 @@ if __name__ == '__main__':
   else:
     layer_range = None
 
-  # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-  #           model_path=args.model_path, layer_range=layer_range)
-  # write_to_csv(args.output_path + '-forward.csv')
-  # metrics_manager().clear_saved()
-  # run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-  #           model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  # write_to_csv(args.output_path + '-reverse.csv')
+  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+            model_path=args.model_path, layer_range=layer_range)
+  write_to_csv(args.output_path + '-forward.csv')
+  metrics_manager().clear_saved()
+  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+            model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+  write_to_csv(args.output_path + '-reverse.csv')
 
-  for idx in range(1, 4):
-    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
-    write_to_csv(args.output_path + f'-forward-{idx}.csv')
-    metrics_manager().clear_saved()
-    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-    write_to_csv(args.output_path + f'-reverse-{idx}.csv')
-    metrics_manager().clear_saved()
+  # for idx in range(1, 4):
+  #   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+  #             model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
+  #   write_to_csv(args.output_path + f'-forward-{idx}.csv')
+  #   metrics_manager().clear_saved()
+  #   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+  #             model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+  #   write_to_csv(args.output_path + f'-reverse-{idx}.csv')
+  #   metrics_manager().clear_saved()
