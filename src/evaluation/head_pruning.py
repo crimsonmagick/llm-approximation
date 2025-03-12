@@ -105,7 +105,7 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
     first_layer, final_layer + 1)
   for layer in layers:
     # prune all heads, then ever other head
-    for run in range(3):
+    for run in range(10):
       logger.info(f"Evaluating all heads pruned for layer={layer}, run={run}")
       clear_memory()
       tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
