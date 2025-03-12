@@ -181,6 +181,12 @@ if __name__ == '__main__':
       type=str,
       help='Range of layers to evaluate'
   )
+  parser.add_argument(
+      '--baseline',
+      type=bool,
+      default=False,
+      help='Optional toggle to just test baseline. Defaults to False.'
+  )
   args = parser.parse_args()
   if args.layer_range is not None:
     arg_range = args.layer_range.split('-')
@@ -188,13 +194,19 @@ if __name__ == '__main__':
   else:
     layer_range = None
 
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range)
-  write_to_csv(args.output_path + '-forward.csv')
-  metrics_manager().clear_saved()
-  run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-            model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  write_to_csv(args.output_path + '-reverse.csv')
+  if args.baseline:
+    test_baseline(batch_size=args.batch_size,
+                  evaluation_row_count=args.eval_rows,
+                  model_path=args.model_path)
+    write_to_csv(args.output_path + '-baseline.csv')
+  else:
+    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+              model_path=args.model_path, layer_range=layer_range)
+    write_to_csv(args.output_path + '-forward.csv')
+    metrics_manager().clear_saved()
+    run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
+              model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+    write_to_csv(args.output_path + '-reverse.csv')
 
   # for idx in range(1, 4):
   #   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
