@@ -26,6 +26,7 @@ if __name__ == '__main__':
 
     # Read and process the CSV file
     with open(input_path, mode='r') as file:
+        measurements_per_layer = 6
         reader = csv.DictReader(file)
 
         baseline = next(reader)
@@ -43,7 +44,6 @@ if __name__ == '__main__':
         energy_per_token = []
         time_per_token = []
         memory_allocated = []
-        measurements_per_layer = 6
 
         for row in reader:
             layer_idx = row['layer_idx']

@@ -13,6 +13,8 @@ from large_language_model_service import get_model
 from llm_type import LLMType
 from src.metrics.metrics import metrics_manager
 
+MEASUREMENTS_COUNT = 3
+
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
@@ -118,6 +120,15 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
         .prune_heads(layer, list(range(0, num_heads, 2))) \
         .run_test(f'pruned-{layer}-every-other-{run}')
 
+def test_baseline(batch_size: int, evaluation_row_count: int,
+    model_path='meta-llama/Meta-Llama-3-8B'):
+  transformer_type: Final[LLMType] = LLMType.LLAMA_3
+  dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
+  tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+  for run_idx in range(10):
+    logger.info(f"Testing baseline, run={run_id}")
+    tester.transformer_under_test(transformer_type, model_path, True) \
+      .run_test(f'baseline-{run_idx}')
 
 def clear_memory():
   gc.collect()
