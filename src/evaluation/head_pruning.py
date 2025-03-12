@@ -13,8 +13,6 @@ from large_language_model_service import get_model
 from llm_type import LLMType
 from src.metrics.metrics import metrics_manager
 
-MEASUREMENTS_COUNT = 3
-
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
@@ -85,8 +83,7 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
   transformer_type: Final[LLMType] = LLMType.LLAMA_3
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
   tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-  tester.transformer_under_test(transformer_type, model_path, True) \
-    .run_test('baseline')
+  tester.transformer_under_test(transformer_type, model_path, True)
 
   num_heads = tester.num_attention_heads()
   if layer_range is not None:
@@ -103,6 +100,12 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
 
   layers = range(final_layer, first_layer - 1, -1) if reverse_eval else range(
     first_layer, final_layer + 1)
+
+  num_gpus = torch.cuda.device_count()
+  logger.info(f"num_gpus={num_gpus}")
+
+  tester.run_test('baseline')
+
   for layer in layers:
     # prune all heads, then ever other head
     for run in range(100):
@@ -187,6 +190,10 @@ if __name__ == '__main__':
       default=False,
       help='Optional toggle to just test baseline. Defaults to False.'
   )
+
+  if not torch.cuda.is_available():
+    raise Exception("Cuda is currently the only supported platform.")
+
   args = parser.parse_args()
   if args.layer_range is not None:
     arg_range = args.layer_range.split('-')
