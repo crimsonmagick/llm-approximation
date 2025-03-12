@@ -78,8 +78,8 @@ class HeadPruningTester:
     return self
 
 
-def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
-    model_path='meta-llama/Meta-Llama-3-8B', layer_range=None):
+def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, model_path='meta-llama/Meta-Llama-3-8B', layer_range=None, runs_per_layer=1):
+
   transformer_type: Final[LLMType] = LLMType.LLAMA_3
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
   tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
@@ -104,11 +104,14 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
   num_gpus = torch.cuda.device_count()
   logger.info(f"num_gpus={num_gpus}")
 
-  tester.run_test('baseline')
+  # run baseline first
+  for run in range (runs_per_layer):
+    tester.run_test(f'baseline-{run}')
 
+  # prune and evaluate on a per-layer basis
   for layer in layers:
     # prune all heads, then ever other head
-    for run in range(100):
+    for run in range(runs_per_layer):
       logger.info(f"Evaluating all heads pruned for layer={layer}, run={run}")
       clear_memory()
       tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
@@ -124,11 +127,11 @@ def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False,
         .run_test(f'pruned-{layer}-every-other-{run}')
 
 def test_baseline(batch_size: int, evaluation_row_count: int,
-    model_path='meta-llama/Meta-Llama-3-8B'):
+    model_path='meta-llama/Meta-Llama-3-8B', runs_per_layer=1):
   transformer_type: Final[LLMType] = LLMType.LLAMA_3
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
   tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-  for run_idx in range(100):
+  for run_idx in range(runs_per_layer):
     logger.info(f"Testing baseline, run={run_idx}")
     tester.transformer_under_test(transformer_type, model_path, True) \
       .run_test(f'baseline-{run_idx}')
@@ -190,6 +193,12 @@ if __name__ == '__main__':
       default=False,
       help='Optional toggle to just test baseline. Defaults to False.'
   )
+  parser.add_argument(
+      '--runs_per_layer',
+      type=int,
+      default=1,
+      help='Number of repeated runs per pruned layer (and baseline). Defaults to 1.'
+  )
 
   if not torch.cuda.is_available():
     raise Exception("Cuda is currently the only supported platform.")
@@ -204,7 +213,7 @@ if __name__ == '__main__':
   if args.baseline:
     test_baseline(batch_size=args.batch_size,
                   evaluation_row_count=args.eval_rows,
-                  model_path=args.model_path)
+                  model_path=args.model_path, runs_per_layer=args.runs_per_layer)
     write_to_csv(args.output_path + '-baseline.csv')
   else:
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
@@ -212,7 +221,8 @@ if __name__ == '__main__':
     write_to_csv(args.output_path + '-forward.csv')
     metrics_manager().clear_saved()
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
+              model_path=args.model_path, layer_range=layer_range, reverse_eval=True,
+              runs_per_layer=args.runs_per_layer)
     write_to_csv(args.output_path + '-reverse.csv')
 
   # for idx in range(1, 4):
