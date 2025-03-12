@@ -126,7 +126,7 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
   tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
   for run_idx in range(10):
-    logger.info(f"Testing baseline, run={run_id}")
+    logger.info(f"Testing baseline, run={run_idx}")
     tester.transformer_under_test(transformer_type, model_path, True) \
       .run_test(f'baseline-{run_idx}')
 
