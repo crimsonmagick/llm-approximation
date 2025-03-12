@@ -35,7 +35,7 @@ class HeadPruningTester:
     self.pruned_layer_idx = None
     self.pruned_head_idxs = None
 
-  def _batch_evaluate(self):
+  def _batch_evaluate(self, test_case):
     num_batches = (
                         self.evaluation_size_rows + self.batch_size - 1) // self.batch_size
     for batch_index in range(num_batches):
@@ -46,6 +46,7 @@ class HeadPruningTester:
       tokens = self.transformer.tokenize(prompts)
       self.transformer.evaluate(tokens)
       self.transformer.per_token_losses(tokens)
+      metrics_manager().save_metrics(test_case + f'batch{batch_index}')
 
   def prune_heads(self, layer_idx, head_idxs):
     self.pruned_head_idxs = head_idxs
@@ -55,8 +56,7 @@ class HeadPruningTester:
     return self
 
   def run_test(self, test_case):
-    self._batch_evaluate()
-    metrics_manager().save_metrics(test_case)
+    self._batch_evaluate(test_case)
     return self
 
   def num_layers(self):
