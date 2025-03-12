@@ -125,7 +125,7 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
   transformer_type: Final[LLMType] = LLMType.LLAMA_3
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
   tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-  for run_idx in range(10):
+  for run_idx in range(100):
     logger.info(f"Testing baseline, run={run_idx}")
     tester.transformer_under_test(transformer_type, model_path, True) \
       .run_test(f'baseline-{run_idx}')
