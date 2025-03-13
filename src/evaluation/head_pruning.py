@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 torch.manual_seed(633)
 
-def run_tests(batch_size: int, evaluation_row_count: int, reverse_eval=False, model_path='meta-llama/Meta-Llama-3-8B', layer_range=None, runs_per_layer=1):
+def run_tests(batch_size: int, evaluation_row_count: int,
+    reverse_eval=False, model_path='meta-llama/Meta-Llama-3-8B',
+    layer_range=None, runs_per_layer=1):
+
+  logger.info(f'runs_per_layer={runs_per_layer}')
 
   transformer_type: Final[LLMType] = LLMType.LLAMA_3
   dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
@@ -131,7 +135,7 @@ if __name__ == '__main__':
       help='Optional toggle to just test baseline. Defaults to False.'
   )
   parser.add_argument(
-      '--runs_per_layer',
+      '--runs-per-layer',
       type=int,
       default=1,
       help='Number of repeated runs per pruned layer (and baseline). Defaults to 1.'
@@ -154,20 +158,12 @@ if __name__ == '__main__':
     write_to_csv(args.output_path + '-baseline.csv')
   else:
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              model_path=args.model_path, layer_range=layer_range)
+              model_path=args.model_path, layer_range=layer_range,
+              runs_per_layer=args.runs_per_layer)
     write_to_csv(args.output_path + '-forward.csv')
     metrics_manager().clear_saved()
     run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-              model_path=args.model_path, layer_range=layer_range, reverse_eval=True,
+              model_path=args.model_path, layer_range=layer_range,
+              reverse_eval=True,
               runs_per_layer=args.runs_per_layer)
     write_to_csv(args.output_path + '-reverse.csv')
-
-  # for idx in range(1, 4):
-  #   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-  #             model_path=args.model_path, layer_range=layer_range, reverse_eval=False)
-  #   write_to_csv(args.output_path + f'-forward-{idx}.csv')
-  #   metrics_manager().clear_saved()
-  #   run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-  #             model_path=args.model_path, layer_range=layer_range, reverse_eval=True)
-  #   write_to_csv(args.output_path + f'-reverse-{idx}.csv')
-  #   metrics_manager().clear_saved()
