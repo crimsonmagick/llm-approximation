@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import re
+from statistics import mean
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -13,6 +14,11 @@ def add_entry(metric_by_layer, layer_idx, batch_idx, entry):
     while len(metric_by_batch) <= batch_idx:
         metric_by_batch.append(list())
     metric_by_batch[batch_idx].append(entry)
+
+def flatten(metric_by_batch):
+    return [metric for batch_list in
+            metric_by_batch for metric in
+            batch_list]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generates graphs of Llama model testing.")
@@ -60,60 +66,67 @@ if __name__ == '__main__':
             add_entry(time_by_layer, layer_idx, batch_idx, test_time)
             add_entry(memory_by_layer, layer_idx, batch_idx, test_memory)
 
-        print("hi")
+        perplexities_baseline = flatten(perplexity_by_layer.pop('baseline'))
+        perplexity_baseline_mean = mean(perplexities_baseline)
+        energy_baseline = flatten(energy_by_layer.pop('baseline'))
+        energy_baseline_mean = mean(energy_baseline)
+        time_baseline = flatten(time_by_layer.pop('baseline'))
+        time_baseline_mean = mean(time_baseline)
+        memory_baseline = flatten(memory_by_layer.pop('baseline'))
+        memory_baseline_mean = mean(memory_baseline)
 
         # Normalize and store final values
-        # for layer_idx in sorted(perplexity_sum_by_layer.keys(), key=lambda x: int(x)):
-        #     perplexities.append((baseline_perplexity / perplexity_sum_by_layer[layer_idx] / measurements_per_layer) * 100)
-        #     energy_per_token.append((energy_sum_by_layer[layer_idx] / baseline_energy / measurements_per_layer)* 100)
-        #     time_per_token.append((time_sum_by_layer[layer_idx] / baseline_time / measurements_per_layer) * 100)
-        #     memory_allocated.append((memory_sum_by_layer[layer_idx] / baseline_memory / 2) * 100)
+        for layer_idx in sorted(perplexity_by_layer.keys(), key=lambda x: int(x)):
+            perplexities.append((perplexity_baseline_mean / mean(flatten(perplexity_by_layer[layer_idx]))) * 100)
+            energy_per_token.append(mean(flatten(energy_by_layer[layer_idx])) / energy_baseline_mean * 100)
+            time_per_token.append(mean(flatten(time_by_layer[layer_idx])) / time_baseline_mean * 100)
+            memory_allocated.append(mean(flatten(memory_by_layer[layer_idx])) / memory_baseline_mean * 100)
 
         # Create dataframes for the tables
-        # layers = list(sorted(perplexity_sum_by_layer.keys(), key=lambda x: int(x)))
-        # perplexity_table = pd.DataFrame({"Layer Index": layers, "Perplexity (%)": perplexities})
-        # energy_table = pd.DataFrame({"Layer Index": layers, "Energy Usage (%)": energy_per_token})
-        # time_table = pd.DataFrame({"Layer Index": layers, "Evaluation Time (%)": time_per_token})
-        # memory_table = pd.DataFrame({"Layer Index": layers, "Allocated Memory (%)": memory_allocated})
-        #
-        # # Display tables and plots
-        # print("\nPer Layer Perplexity Table")
-        # print(perplexity_table)
-        # plt.figure()
-        # plt.plot(perplexities)
-        # plt.title("Per Layer Perplexity After Attention Head Pruning")
-        # plt.xlabel("Layer Index")
-        # plt.ylabel("Perplexity Compared to Baseline (Percent)")
-        # plt.savefig(f'{base_output_path}/perplexity.png')
-        # plt.show()
-        #
-        # print("\nEnergy Usage Table")
-        # print(energy_table)
-        # plt.figure()
-        # plt.plot(energy_per_token)
-        # plt.title("Energy Usage Per Token After Attention Head Pruning")
-        # plt.xlabel("Layer Index")
-        # plt.ylabel("Energy Usage Compared to Baseline (Percent)")
-        # plt.savefig(f'{base_output_path}/energy.png')
-        # plt.show()
-        #
-        # print("\nEvaluation Time Table")
-        # print(time_table)
-        # plt.figure()
-        # plt.plot(time_per_token)
-        # plt.title("Evaluation Time Per Token After Attention Head Pruning")
-        # plt.xlabel("Layer Index")
-        # plt.ylabel("Evaluation Time Compared to Baseline (Percent)")
-        # plt.savefig(f'{base_output_path}/evaluation.png')
-        # plt.show()
-        #
-        # print("\nAllocated Memory Table")
-        # print(memory_table)
-        # plt.figure()
-        # plt.plot(memory_allocated)
+        layers = list(sorted(perplexity_by_layer.keys(), key=lambda x: int(x)))
+        perplexity_table = pd.DataFrame({"Layer Index": layers, "Perplexity (%)": perplexities})
+        energy_table = pd.DataFrame({"Layer Index": layers, "Energy Usage (%)": energy_per_token})
+        time_table = pd.DataFrame({"Layer Index": layers, "Evaluation Time (%)": time_per_token})
+        memory_table = pd.DataFrame({"Layer Index": layers, "Allocated Memory (%)": memory_allocated})
+
+        # Display tables and plots
+        print("\nPer Layer Perplexity Table")
+        print(perplexity_table)
+        plt.figure()
+        plt.plot(perplexities)
+        plt.title("Per Layer Perplexity After Attention Head Pruning")
+        plt.xlabel("Layer Index")
+        plt.ylabel("Perplexity Compared to Baseline (Percent)")
+        plt.savefig(f'{base_output_path}/perplexity.png')
+        plt.show()
+
+        print("\nEnergy Usage Table")
+        print(energy_table)
+        plt.figure()
+        plt.plot(energy_per_token)
+        plt.title("Energy Usage Per Token After Attention Head Pruning")
+        plt.xlabel("Layer Index")
+        plt.ylabel("Energy Usage Compared to Baseline (Percent)")
+        plt.savefig(f'{base_output_path}/energy.png')
+        plt.show()
+
+        print("\nEvaluation Time Table")
+        print(time_table)
+        plt.figure()
+        plt.plot(time_per_token)
+        plt.title("Evaluation Time Per Token After Attention Head Pruning")
+        plt.xlabel("Layer Index")
+        plt.ylabel("Evaluation Time Compared to Baseline (Percent)")
+        plt.savefig(f'{base_output_path}/evaluation.png')
+        plt.show()
+
+        print("\nAllocated Memory Table")
+        print(memory_table)
+        plt.figure()
+        plt.plot(memory_allocated)
         # plt.ylim(99.63, 99.64)  # Adjust the y-axis limits to zoom into the range of interest
-        # plt.title("Allocated Memory for Model After Attention Head Pruning")
-        # plt.xlabel("Layer Index")
-        # plt.ylabel("Allocated Memory Compared to Baseline (Percent)")
-        # plt.savefig(f'{base_output_path}/allocated.png')
-        # plt.show()
+        plt.title("Allocated Memory for Model After Attention Head Pruning")
+        plt.xlabel("Layer Index")
+        plt.ylabel("Allocated Memory Compared to Baseline (Percent)")
+        plt.savefig(f'{base_output_path}/allocated.png')
+        plt.show()
