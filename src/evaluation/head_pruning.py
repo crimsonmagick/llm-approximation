@@ -47,25 +47,28 @@ def run_tests(batch_size: int, evaluation_row_count: int,
 
   # run baseline first
   for run in range (runs_per_layer):
+    clear_memory()
     tester.run_test(f'baseline-{run}')
 
-  # prune and evaluate on a per-layer basis
   for layer in layers:
+
     # prune all heads, then ever other head
+    tester \
+     .transformer_under_test(transformer_type, model_path,True) \
+     .prune_heads(layer, list(range(num_heads)))
+
     for run in range(runs_per_layer):
       logger.info(f"Evaluating all heads pruned for layer={layer}, run={run}")
       clear_memory()
-      tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-      tester.transformer_under_test(transformer_type, model_path,
-                                    True) \
-        .prune_heads(layer, list(range(num_heads))) \
-        .run_test(f'pruned-{layer}-all-{run}')
+      tester.run_test(f'pruned-{layer}-all-{run}')
 
+    tester \
+     .transformer_under_test(transformer_type, model_path, True) \
+     .prune_heads(layer, list(range(0, num_heads, 2)))
+    for run in range(runs_per_layer):
       logger.info(f"Evaluating every other head pruned for layer={layer}, run={run}")
       clear_memory()
-      tester.transformer_under_test(transformer_type, model_path, True) \
-        .prune_heads(layer, list(range(0, num_heads, 2))) \
-        .run_test(f'pruned-{layer}-every-other-{run}')
+      tester.run_test(f'pruned-{layer}-every-other-{run}')
 
 def test_baseline(batch_size: int, evaluation_row_count: int,
     model_path='meta-llama/Meta-Llama-3-8B', runs_per_layer=1):
