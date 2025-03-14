@@ -11,7 +11,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     input_path = args.input_path
-    num_batch = 10
+    num_batch = 1
     batch_energies_sorted = list()
     for batch_idx in range(num_batch):
       batch_energies_sorted.append(list())

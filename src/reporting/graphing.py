@@ -2,7 +2,7 @@ import argparse
 import csv
 import os
 import re
-from statistics import mean
+from statistics import mean, median, stdev
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -20,6 +20,36 @@ def flatten(metric_by_batch):
             metric_by_batch for metric in
             batch_list]
 
+def generate_layer_energy_metrics(layer_name, layer_energy_per_batch):
+    # for batch_idx in range(len(layer_energy_per_batch)):
+    #     energies_sorted = sorted(layer_energy_per_batch[batch_idx])
+    #
+    #     energy_max = max(energies_sorted)
+    #     energy_min = min(energies_sorted)
+    #     energy_mean = mean(energies_sorted)
+    #     energy_median = median(energies_sorted)
+    #     energy_std_dev = stdev(energies_sorted)
+    #
+    #     print(f"layer={layer_name}, batch={batch_idx}, energy_mean={energy_mean}\n"
+    #           f"layer={layer_name}, batch={batch_idx}, energy_median={energy_median}\n"
+    #           f"layer={layer_name}, batch={batch_idx}, energy_min={energy_min}\n"
+    #           f"layer={layer_name}, batch={batch_idx}, energy_max={energy_max}\n"
+    #           f"layer={layer_name}, batch={batch_idx}, range={energy_max - energy_min}\n"
+    #           f"layer={layer_name}, batch={batch_idx}, energy_std_dev={energy_std_dev}")
+
+    aggregate_energies_sorted = [energy for batch_list in layer_energy_per_batch for energy in batch_list]
+    energy_max = max(aggregate_energies_sorted)
+    energy_min = min(aggregate_energies_sorted)
+    energy_mean = mean(aggregate_energies_sorted)
+    energy_median = median(aggregate_energies_sorted)
+    energy_std_dev = stdev(aggregate_energies_sorted)
+    print(f"layer_name={layer_name}, aggregate_energy_mean={energy_mean}\n"
+          f"layer_name={layer_name}, aggregate_energy_median={energy_median}\n"
+          f"layer_name={layer_name}, aggregate_energy_min={energy_min}\n"
+          f"layer_name={layer_name}, aggregate_energy_max={energy_max}\n"
+          f"layer_name={layer_name}, aggregate_range={energy_max - energy_min}\n"
+          f"layer_name={layer_name}, aggregate_energy_std_dev={energy_std_dev}")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generates graphs of Llama model testing.")
     parser.add_argument(
@@ -32,11 +62,18 @@ if __name__ == '__main__':
         type=str,
         help='Input path for csv file, required'
     )
+    parser.add_argument(
+        '--title-prefix',
+        type=str,
+        default=None,
+        help='Title prefix for generated graphs, optional'
+    )
     args = parser.parse_args()
     input_path = args.input_path
     out_subpath = re.search(r'([^/]+)\.csv$', input_path).group(1)
     base_output_path = args.output_dir + '/' + out_subpath
     os.makedirs(base_output_path, exist_ok=True)
+    title_prefix = '' if args.title_prefix is None else args.title_prefix + ': '
 
     # Read and process the CSV file
     with open(input_path, mode='r') as file:
@@ -66,6 +103,10 @@ if __name__ == '__main__':
             add_entry(time_by_layer, layer_idx, batch_idx, test_time)
             add_entry(memory_by_layer, layer_idx, batch_idx, test_memory)
 
+        # generate baseline stats per batch
+        generate_layer_energy_metrics('baseline', energy_by_layer['baseline'])
+
+        # generate baseline means
         perplexities_baseline = flatten(perplexity_by_layer.pop('baseline'))
         perplexity_baseline_mean = mean(perplexities_baseline)
         energy_baseline = flatten(energy_by_layer.pop('baseline'))
@@ -77,6 +118,7 @@ if __name__ == '__main__':
 
         # Normalize and store final values
         for layer_idx in sorted(perplexity_by_layer.keys(), key=lambda x: int(x)):
+            generate_layer_energy_metrics(layer_idx, energy_by_layer[layer_idx])
             perplexities.append((perplexity_baseline_mean / mean(flatten(perplexity_by_layer[layer_idx]))) * 100)
             energy_per_token.append(mean(flatten(energy_by_layer[layer_idx])) / energy_baseline_mean * 100)
             time_per_token.append(mean(flatten(time_by_layer[layer_idx])) / time_baseline_mean * 100)
@@ -94,7 +136,7 @@ if __name__ == '__main__':
         print(perplexity_table)
         plt.figure()
         plt.plot(perplexities)
-        plt.title("Per Layer Perplexity After Attention Head Pruning")
+        plt.title(title_prefix + "Per Layer Perplexity After Attention Head Pruning")
         plt.xlabel("Layer Index")
         plt.ylabel("Perplexity Compared to Baseline (Percent)")
         plt.savefig(f'{base_output_path}/perplexity.png')
@@ -104,7 +146,7 @@ if __name__ == '__main__':
         print(energy_table)
         plt.figure()
         plt.plot(energy_per_token)
-        plt.title("Energy Usage Per Token After Attention Head Pruning")
+        plt.title(title_prefix + "Energy Usage Per Token After Attention Head Pruning")
         plt.xlabel("Layer Index")
         plt.ylabel("Energy Usage Compared to Baseline (Percent)")
         plt.savefig(f'{base_output_path}/energy.png')
@@ -114,19 +156,19 @@ if __name__ == '__main__':
         print(time_table)
         plt.figure()
         plt.plot(time_per_token)
-        plt.title("Evaluation Time Per Token After Attention Head Pruning")
+        plt.title(title_prefix + "Evaluation Time Per Token After Attention Head Pruning")
         plt.xlabel("Layer Index")
         plt.ylabel("Evaluation Time Compared to Baseline (Percent)")
         plt.savefig(f'{base_output_path}/evaluation.png')
         plt.show()
 
-        print("\nAllocated Memory Table")
-        print(memory_table)
-        plt.figure()
-        plt.plot(memory_allocated)
-        # plt.ylim(99.63, 99.64)  # Adjust the y-axis limits to zoom into the range of interest
-        plt.title("Allocated Memory for Model After Attention Head Pruning")
-        plt.xlabel("Layer Index")
-        plt.ylabel("Allocated Memory Compared to Baseline (Percent)")
-        plt.savefig(f'{base_output_path}/allocated.png')
-        plt.show()
+        # print("\nAllocated Memory Table")
+        # print(memory_table)
+        # plt.figure()
+        # plt.plot(memory_allocated)
+        # # plt.ylim(99.63, 99.64)  # Adjust the y-axis limits to zoom into the range of interest
+        # plt.title(title_prefix="Allocated Memory for Model After Attention Head Pruning")
+        # plt.xlabel("Layer Index")
+        # plt.ylabel("Allocated Memory Compared to Baseline (Percent)")
+        # plt.savefig(f'{base_output_path}/allocated.png')
+        # plt.show()
