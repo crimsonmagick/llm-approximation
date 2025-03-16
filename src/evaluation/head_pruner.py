@@ -1,4 +1,5 @@
 import string
+import time
 
 import torch
 from datasets import load_dataset
@@ -29,7 +30,9 @@ class HeadPruningTester:
       batch = self.test_data.select(range(start_idx, end_idx))
       prompts = [example["text"] for example in batch]
       tokens = self.transformer.tokenize(prompts)
+      start = time.time()
       self.transformer.evaluate(tokens)
+      print(f"Time for evaluation: {time.time() - start}\n")
       self.transformer.per_token_losses(tokens)
       metrics_manager().save_metrics(test_case + f'batch{batch_index}')
 
