@@ -19,6 +19,7 @@ class MetricsManager:
         self._allocated_memory = None
         self._layer_idx = None
         self._head_idxs = None
+        self._temperature = None
         self._saved_metrics = dict()
         self.header = (
             'label',
@@ -27,9 +28,10 @@ class MetricsManager:
             'perplexity',
             'average_energy_per_token_mj',
             'average_time_per_token_ms',
-            'allocated_memory'
+            'allocated_memory',
+            'temperature'
         )
-    
+
     def clear(self):
         self._perplexity = None
         self._execution_time_ms = None
@@ -66,6 +68,9 @@ class MetricsManager:
     def allocated_memory(self, allocated_memory):
         self._allocated_memory = allocated_memory
         return self
+
+    def temperature(self, temperature):
+        self._temperature = temperature
     
     def layer_idx(self, layer_idx):
         self._layer_idx = layer_idx
@@ -78,7 +83,7 @@ class MetricsManager:
     def save_metrics(self, label):
         self._saved_metrics[label] = (
             label, self._layer_idx, self._head_idxs, self._perplexity, self._average_energy_per_token_mj,
-            self._average_time_per_token_ms, self._allocated_memory)
+            self._average_time_per_token_ms, self._allocated_memory, self._temperature)
         return self
     
     def get_metrics(self):
@@ -98,6 +103,7 @@ class EnergyRecorder:
         self.end_energy = None
         self.start_energy = None
         self.start_time = None
+        self.temperature = None
         pynvml.nvmlInit()
         self.handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # in a simple consumer setup, GPU will be 0
     
@@ -106,14 +112,19 @@ class EnergyRecorder:
         self.start_time = time.time()
         self.end_energy = None
         self.end_time = None
+        self.temperature = None
         return self
     
     def __get_total_energy(self):
         return pynvml.nvmlDeviceGetTotalEnergyConsumption(self.handle)
+
+    def __get_gpu_temperature(self):
+        return pynvml.nvmlDeviceGetTemperature(self.handle, pynvml.NVML_TEMPERATURE_GPU)
     
     def end(self):
         self.end_energy = self.__get_total_energy()
         self.end_time = time.time()
+        self.temperature = self.__get_gpu_temperature()
         return self
     
     def get_metrics(self):
@@ -121,7 +132,7 @@ class EnergyRecorder:
             return 0, 0
         energy_consumed_mj = self.end_energy - self.start_energy
         duration = self.end_time - self.start_time
-        return energy_consumed_mj, duration * 1000
+        return energy_consumed_mj, duration * 1000, self.temperature
     
     def __del__(self):
         pynvml.nvmlShutdown()
@@ -137,15 +148,17 @@ def capture_evaluation(func):
             self.func = func
             self.instance = instance
             self.energy_usage_mj = 0
+            self.temperature = 0
         
         def capture(self, *args, **kwargs):
             energy_recorder.start()
             evaluation = self.func(self.instance, *args, **kwargs)
-            energy_usage_mj, execution_time_ms = energy_recorder.end().get_metrics()
+            energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
             self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
             self.batch_count += 1
+            self.temperature = temperature
             average_time_per_token_ms = self.execution_time_ms / self.token_count
             average_energy_per_token_mj = self.energy_usage_mj / self.token_count
             logger.debug(
@@ -161,7 +174,8 @@ def capture_evaluation(func):
                 .total_energy(self.energy_usage_mj) \
                 .average_time_per_token_ms(average_time_per_token_ms) \
                 .average_energy_per_token_mj(average_energy_per_token_mj) \
-                .allocated_memory(torch.cuda.memory_allocated())
+                .allocated_memory(torch.cuda.memory_allocated()) \
+                .temperature(temperature)
             
             return evaluation
     
