@@ -142,7 +142,7 @@ def main():
     for report in reports:
         perplexity = report['perplexity']
         report_name = report['report_name']
-        plt.plot(perplexity, label=report_name)
+        plt.plot(report['layers'], perplexity, label=report_name)
         print(f'\nPerplexity for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Perplexity (%)": perplexity}))
     plt.title("Per Layer Perplexity After Attention Head Pruning")
@@ -156,7 +156,7 @@ def main():
     for report in reports:
         energy_per_token = report['energy_per_token']
         report_name = report['report_name']
-        plt.plot(energy_per_token, label=report_name)
+        plt.plot(report['layers'], energy_per_token, label=report_name)
         print(f'\nEnergy per Token for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Energy Usage (%)": energy_per_token}))
     plt.title("Energy Usage Per Token After Attention Head Pruning")
@@ -170,7 +170,7 @@ def main():
     for report in reports:
         time_per_token = report['time_per_token']
         report_name = report['report_name']
-        plt.plot(time_per_token, label=report_name)
+        plt.plot(report['layers'], time_per_token, label=report_name)
         print(f'\nInference Time for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Inference Time (%)": time_per_token}))
     plt.title("Inference Time Per Token After Attention Head Pruning")
@@ -184,7 +184,7 @@ def main():
     for report in reports:
         memory_allocated = report['memory_allocated']
         report_name = report['report_name']
-        plt.plot(memory_allocated, label=report_name)
+        plt.plot(report['layers'], memory_allocated, label=report_name)
         print(f'Memory Allocation for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Allocated Memory (%)": memory_allocated}))
 

@@ -29,6 +29,7 @@ class HeadPruningTester:
       end_idx = min(start_idx + self.batch_size, self.evaluation_size_rows)
       batch = self.test_data.select(range(start_idx, end_idx))
       prompts = [example["text"] for example in batch]
+      print(f"PROMPT={prompts}")
       tokens = self.transformer.tokenize(prompts)
       start = time.time()
       self.transformer.evaluate(tokens)
