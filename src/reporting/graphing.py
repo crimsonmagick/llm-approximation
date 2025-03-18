@@ -156,7 +156,7 @@ def main():
     for report in reports:
         energy_per_token = report['energy_per_token']
         report_name = report['report_name']
-        plt.plot(report['layers'], energy_per_token, label=report_name)
+        plt.plot( energy_per_token, label=report_name)
         print(f'\nEnergy per Token for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Energy Usage (%)": energy_per_token}))
     plt.title("Energy Usage Per Token After Attention Head Pruning")

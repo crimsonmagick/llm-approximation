@@ -157,6 +157,7 @@ def capture_evaluation(func):
             self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
+            print(f"execution_time={execution_time_ms}, output={evaluation[0]}")
             self.batch_count += 1
             self.temperature = temperature
             average_time_per_token_ms = self.execution_time_ms / self.token_count

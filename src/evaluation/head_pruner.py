@@ -1,7 +1,6 @@
 import string
 import time
 
-import torch
 from datasets import load_dataset
 from large_language_model_service import get_model
 from src.metrics.metrics import metrics_manager
