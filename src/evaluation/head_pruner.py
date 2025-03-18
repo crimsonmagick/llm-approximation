@@ -1,6 +1,7 @@
 import string
 import time
 
+import torch
 from datasets import load_dataset
 from large_language_model_service import get_model
 from src.metrics.metrics import metrics_manager
@@ -31,8 +32,11 @@ class HeadPruningTester:
       print(f"PROMPT={prompts}")
       tokens = self.transformer.tokenize(prompts)
       start = time.time()
-      self.transformer.evaluate(tokens)
       print(f"Time for evaluation: {time.time() - start}\n")
+      generated, _, _ = self.transformer.evaluate(tokens)
+      detok = self.transformer.detokenize(generated)
+      print(f"generated={detok}")
+
       self.transformer.per_token_losses(tokens)
       metrics_manager().save_metrics(test_case + f'batch{batch_index}')
 
