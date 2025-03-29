@@ -32,8 +32,8 @@ class HeadPruningTester:
       print(f"PROMPT={prompts}")
       tokens = self.transformer.tokenize(prompts)
       start = time.time()
-      print(f"Time for evaluation: {time.time() - start}\n")
       generated, _ = self.transformer.evaluate(tokens)
+      print(f"Time for evaluation: {time.time() - start}\n")
       detok = self.transformer.detokenize(generated)
       print(f"generated={detok}")
 

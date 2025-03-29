@@ -3,8 +3,8 @@ from transformers import AutoTokenizer, LlamaForCausalLM
 
 import torch
 
-model_name = 'meta-llama/Meta-Llama-3-8B'
-# torch.manual_seed(633)
+model_name = '/home/welb/ai/models/Meta-Llama-3-8B'
+torch.manual_seed(633)
 model = PrunedLlamaForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map='cuda')
 print(model)
 heads = dict()

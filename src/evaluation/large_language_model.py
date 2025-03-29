@@ -90,7 +90,7 @@ class LlamaFacade(LargeLanguageModelFacade):
         super(LlamaFacade, self).__init__(llm_type, model, model_path, device)
     
     def detokenize(self, tokens):
-        return self.tokenizer.decode(tokens)
+        return self.tokenizer.batch_decode(tokens)
     
     def tokenize(self, prompt):
         return self.tokenizer(prompt, return_tensors='pt', padding=PaddingStrategy.LONGEST, padding_side='left',
