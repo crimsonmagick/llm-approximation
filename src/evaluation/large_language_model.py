@@ -57,16 +57,7 @@ class LargeLanguageModelFacade(ABC):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
         with torch.no_grad():
-            outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-            logits = outputs.logits
-        labels = input_ids.clone() # labels are derived from input
-        labels = labels[:, 1:].contiguous() # Drop the first label - it isn't useful as no logits are generated for it
-        labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length], in preperation for cross_entroy calculation
-        logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
-        logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size * sequence_length, vocab_size]
-        per_token_loss = functional.cross_entropy(logits, labels, reduction='none') # vector of per token losses
-        attention_mask_vector = attention_mask[:, :-1].reshape(-1).contiguous()
-        return per_token_loss * attention_mask_vector # apply the attention mask to remove padding, which can skew perplexity measurements
+            return self.model(input_ids=input_ids, attention_mask=attention_mask)
 
 
 class MissingParameterException(Exception):

@@ -5,6 +5,7 @@ import torch
 
 import pynvml
 from torch import tensor
+from torch.nn import functional
 
 logger = logging.getLogger(__name__)
 
@@ -197,16 +198,32 @@ def capture_loss(func):
             self.instance = instance
         
         def capture(self, *args, **kwargs):
-            token_sequences: tensor = args[0]['input_ids']
+            tokens = args[0]
+            token_sequences: tensor = tokens['input_ids']
+            attention_mask = tokens['attention_mask']
             for sequence in token_sequences:
-                self.token_count += len(
-                    sequence) - 1  # can't count first token, is not generated as a part of evaluation
-            token_losses = func(self.instance, *args, **kwargs)
+                self.token_count += len(sequence) - 1  # can't count first token, is not generated as a part of
+                # evaluation
+            
+            predicted = func(self.instance, *args, **kwargs)
+            logits = predicted.logits
+            labels = token_sequences.clone()  # labels are derived from input
+            labels = labels[:,1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
+            # for it
+            labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length],
+            # in preperation for cross_entroy calculation
+            logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
+            logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size *
+            # sequence_length, vocab_size]
+            per_token_loss = functional.cross_entropy(logits, labels, reduction='none')  # vector of per token losses
+            attention_mask_vector = attention_mask[:, :-1].reshape(-1).contiguous()
+            token_losses = per_token_loss * attention_mask_vector  # apply the attention mask to remove padding,
+            # which can skew perplexity measurements
             self.aggregate_loss += token_losses.sum()
             perplexity = self.aggregate_loss / self.token_count
             logger.debug(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
-            return token_losses
+            return predicted
     
     def wrapper(self, *args, **kwargs):
         # Lazily create a CaptureLoss instance if it doesn't exist
