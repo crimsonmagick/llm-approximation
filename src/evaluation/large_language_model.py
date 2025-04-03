@@ -3,11 +3,10 @@ import string
 from abc import ABC, abstractmethod
 
 import torch
-import torch.nn.functional as functional
 
 from llm_type import LLMType
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
-from src.metrics.metrics import capture_evaluation, capture_loss
+from src.metrics.metrics import capture_evaluation
 from transformers import AutoTokenizer, LlamaForCausalLM
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
@@ -36,7 +35,6 @@ class LargeLanguageModelFacade(ABC):
     def vocab_size(self):
         pass
     
-    @capture_evaluation
     def evaluate(self, tokens, max_length=500):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
@@ -52,8 +50,8 @@ class LargeLanguageModelFacade(ABC):
             )
         return evaluation[0], evaluation.shape[0] * evaluation.shape[1]
     
-    @capture_loss
-    def per_token_losses(self, tokens):
+    @capture_evaluation
+    def predict(self, tokens):
         input_ids = tokens['input_ids']
         attention_mask = tokens['attention_mask']
         with torch.no_grad():

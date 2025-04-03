@@ -32,7 +32,7 @@ class MetricsManager:
             'allocated_memory',
             'temperature'
         )
-
+    
     def clear(self):
         self._perplexity = None
         self._execution_time_ms = None
@@ -42,10 +42,10 @@ class MetricsManager:
         self._allocated_memory = None
         self._layer_idx = None
         self._head_idxs = None
-
+    
     def clear_saved(self):
         self._saved_metrics = dict()
-
+    
     def perplexity(self, perplexity):
         self._perplexity = perplexity
         return self
@@ -69,9 +69,10 @@ class MetricsManager:
     def allocated_memory(self, allocated_memory):
         self._allocated_memory = allocated_memory
         return self
-
+    
     def temperature(self, temperature):
         self._temperature = temperature
+        return self
     
     def layer_idx(self, layer_idx):
         self._layer_idx = layer_idx
@@ -118,7 +119,7 @@ class EnergyRecorder:
     
     def __get_total_energy(self):
         return pynvml.nvmlDeviceGetTotalEnergyConsumption(self.handle)
-
+    
     def __get_gpu_temperature(self):
         return pynvml.nvmlDeviceGetTemperature(self.handle, pynvml.NVML_TEMPERATURE_GPU)
     
@@ -141,9 +142,12 @@ class EnergyRecorder:
 
 def capture_evaluation(func):
     energy_recorder = EnergyRecorder()
+    
     class CaptureEvaluation:
         def __init__(self, instance):
+            self.aggregate_loss = 0
             self.token_count = 0
+            self.loss_token_count = 0
             self.execution_time_ms = 0
             self.batch_count = 0
             self.func = func
@@ -152,10 +156,16 @@ def capture_evaluation(func):
             self.temperature = 0
         
         def capture(self, *args, **kwargs):
+            tokens = args[0]
+            token_sequences: tensor = tokens['input_ids']
+            attention_mask = tokens['attention_mask']
+            for sequence in token_sequences:
+                self.token_count += len(sequence)
+                self.loss_token_count += len(sequence) - 1  # can't count first token, is not generated as a part of
+                # evaluation
             energy_recorder.start()
-            evaluation = self.func(self.instance, *args, **kwargs)
+            predicted = self.func(self.instance, *args, **kwargs)
             energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
-            self.token_count += evaluation[1]
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
             self.batch_count += 1
@@ -170,45 +180,11 @@ def capture_evaluation(func):
                 f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} j")
             logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
             logger.debug(f"Reserved Memory: {torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
-            metrics_manager() \
-                .execution_time_ms(self.execution_time_ms) \
-                .total_energy(self.energy_usage_mj) \
-                .average_time_per_token_ms(average_time_per_token_ms) \
-                .average_energy_per_token_mj(average_energy_per_token_mj) \
-                .allocated_memory(torch.cuda.memory_allocated()) \
-                .temperature(temperature)
             
-            return evaluation
-    
-    def wrapper(self, *args, **kwargs):
-        # Lazily create a CaptureEvaluation instance if it doesn't exist
-        if not hasattr(self, '_capture_evaluation'):
-            self._capture_evaluation = CaptureEvaluation(self)
-        
-        return self._capture_evaluation.capture(*args, **kwargs)
-    
-    return wrapper
-
-
-def capture_loss(func):
-    class CaptureLoss:
-        def __init__(self, instance):
-            self.token_count = 0
-            self.aggregate_loss = 0
-            self.instance = instance
-        
-        def capture(self, *args, **kwargs):
-            tokens = args[0]
-            token_sequences: tensor = tokens['input_ids']
-            attention_mask = tokens['attention_mask']
-            for sequence in token_sequences:
-                self.token_count += len(sequence) - 1  # can't count first token, is not generated as a part of
-                # evaluation
-            
-            predicted = func(self.instance, *args, **kwargs)
+            # ***** Perplexity *****
             logits = predicted.logits
             labels = token_sequences.clone()  # labels are derived from input
-            labels = labels[:,1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
+            labels = labels[:, 1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
             # for it
             labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length],
             # in preperation for cross_entroy calculation
@@ -220,16 +196,26 @@ def capture_loss(func):
             token_losses = per_token_loss * attention_mask_vector  # apply the attention mask to remove padding,
             # which can skew perplexity measurements
             self.aggregate_loss += token_losses.sum()
-            perplexity = self.aggregate_loss / self.token_count
+            perplexity = self.aggregate_loss / self.loss_token_count
             logger.debug(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
+            # ***** Update Metrics Snapshot *****
+            
+            metrics_manager() \
+                .execution_time_ms(self.execution_time_ms) \
+                .total_energy(self.energy_usage_mj) \
+                .average_time_per_token_ms(average_time_per_token_ms) \
+                .average_energy_per_token_mj(average_energy_per_token_mj) \
+                .allocated_memory(torch.cuda.memory_allocated()) \
+                .temperature(temperature) \
+                .perplexity(perplexity.item())
             return predicted
     
     def wrapper(self, *args, **kwargs):
-        # Lazily create a CaptureLoss instance if it doesn't exist
-        if not hasattr(self, '_capture_loss'):
-            self._capture_loss = CaptureLoss(self)
+        # Lazily create a CaptureEvaluation instance if it doesn't exist
+        if not hasattr(self, '_capture_evaluation'):
+            self._capture_evaluation = CaptureEvaluation(self)
         
-        return self._capture_loss.capture(*args, **kwargs)
+        return self._capture_evaluation.capture(*args, **kwargs)
     
     return wrapper
