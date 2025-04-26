@@ -1,7 +1,6 @@
 import string
 import time
 
-import torch
 from datasets import load_dataset
 from large_language_model_service import get_model
 from src.metrics.metrics import metrics_manager
@@ -21,7 +20,7 @@ class HeadPruningTester:
         self.pruned_layer_idx = None
         self.pruned_head_idxs = None
     
-    def _batch_evaluate(self, test_case):
+    def batch_evaluate(self, test_case):
         num_batches = (self.evaluation_size_rows + self.batch_size - 1) // self.batch_size
         for batch_index in range(num_batches):
             start_idx = batch_index * self.batch_size
@@ -30,10 +29,10 @@ class HeadPruningTester:
             prompts = [example["text"] for example in batch]
             tokens = self.transformer.tokenize(prompts)
             
-            print(f"prompts={prompts}")
+            # print(f"prompts={prompts}")
             start = time.time()
             self.transformer.predict(tokens)
-            print(f"Time for evaluation: {time.time() - start}\n")
+            print(f"test_case={test_case}, batch_index={batch_index}, evaluation_timne={time.time() - start}\n")
             metrics_manager().save_metrics(test_case + f'batch{batch_index}')
     
     def prune_heads(self, layer_idx, head_idxs):
@@ -41,10 +40,6 @@ class HeadPruningTester:
         self.pruned_layer_idx = layer_idx
         self.transformer.model.prune_heads({layer_idx: head_idxs})
         metrics_manager().layer_idx(layer_idx).head_idxs(head_idxs)
-        return self
-    
-    def run_test(self, test_case):
-        self._batch_evaluate(test_case)
         return self
     
     def num_layers(self):

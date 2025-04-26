@@ -49,9 +49,9 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     logger.info(f"num_gpus={num_gpus}")
     
     # run baseline first
-    for run in range(runs_per_layer):
+    for run_idx in range(runs_per_layer):
         clear_memory()
-        tester.run_test(f'baseline-{run}')
+        tester.batch_evaluate(f'baseline-{run_idx}')
     
     for layer in layers:
         
@@ -60,18 +60,18 @@ def run_tests(batch_size: int, evaluation_row_count: int,
             .transformer_under_test(transformer_type, model_path, True) \
             .prune_heads(layer, list(range(num_heads)))
         
-        for run in range(runs_per_layer):
-            logger.info(f"Evaluating all heads pruned for layer={layer}, run={run}")
+        for run_idx in range(runs_per_layer):
+            logger.info(f"Evaluating all heads pruned for layer={layer}, run={run_idx}")
             clear_memory()
-            tester.run_test(f'pruned-{layer}-all-{run}')
+            tester.batch_evaluate(f'pruned-{layer}-all-{run_idx}')
         
         tester \
             .transformer_under_test(transformer_type, model_path, True) \
             .prune_heads(layer, list(range(0, num_heads, 2)))
-        for run in range(runs_per_layer):
-            logger.info(f"Evaluating every other head pruned for layer={layer}, run={run}")
+        for run_idx in range(runs_per_layer):
+            logger.info(f"Evaluating every other head pruned for layer={layer}, run={run_idx}")
             clear_memory()
-            tester.run_test(f'pruned-{layer}-every-other-{run}')
+            tester.batch_evaluate(f'pruned-{layer}-every-other-{run_idx}')
             
 
 
@@ -83,7 +83,7 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
     for run_idx in range(runs_per_layer):
         logger.info(f"Testing baseline, run={run_idx}")
         tester.transformer_under_test(transformer_type, model_path, True) \
-            .run_test(f'baseline-{run_idx}')
+            .batch_evaluate(f'baseline-{run_idx}')
 
 
 def clear_memory():
