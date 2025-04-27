@@ -1,6 +1,7 @@
 import logging
 import time
 
+import numpy as np
 import torch
 
 import pynvml
@@ -192,11 +193,11 @@ def capture_evaluation(func):
             logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size *
             # sequence_length, vocab_size]
             per_token_loss = functional.cross_entropy(logits, labels, reduction='none')  # vector of per token losses
-            attention_mask_vector = attention_mask[:, :-1].reshape(-1).contiguous()
+            attention_mask_vector = attention_mask[:, 1:].reshape(-1).contiguous()
             token_losses = per_token_loss * attention_mask_vector  # apply the attention mask to remove padding,
             # which can skew perplexity measurements
             self.aggregate_loss += token_losses.sum()
-            perplexity = self.aggregate_loss / self.loss_token_count
+            perplexity = torch.exp(self.aggregate_loss / self.loss_token_count)
             logger.debug(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
             # ***** Update Metrics Snapshot *****
