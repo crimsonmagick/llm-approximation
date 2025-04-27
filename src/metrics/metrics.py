@@ -1,7 +1,7 @@
+import atexit
 import logging
 import time
 
-import numpy as np
 import torch
 
 import pynvml
@@ -94,7 +94,8 @@ class MetricsManager:
 
 
 singleton = MetricsManager()
-
+pynvml.nvmlInit()
+atexit.register(pynvml.nvmlShutdown)
 
 def metrics_manager():
     return singleton
@@ -107,7 +108,6 @@ class EnergyRecorder:
         self.start_energy = None
         self.start_time = None
         self.temperature = None
-        pynvml.nvmlInit()
         self.handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # in a simple consumer setup, GPU will be 0
     
     def start(self):
@@ -136,13 +136,9 @@ class EnergyRecorder:
         energy_consumed_mj = self.end_energy - self.start_energy
         duration = self.end_time - self.start_time
         return energy_consumed_mj, duration * 1000, self.temperature
-    
-    def __del__(self):
-        pynvml.nvmlShutdown()
 
 
 def capture_evaluation(func):
-    energy_recorder = EnergyRecorder()
     
     class CaptureEvaluation:
         def __init__(self, instance):
@@ -155,49 +151,55 @@ def capture_evaluation(func):
             self.instance = instance
             self.energy_usage_mj = 0
             self.temperature = 0
+            self.energy_recorder = EnergyRecorder()
         
         def capture(self, *args, **kwargs):
             tokens = args[0]
             token_sequences: tensor = tokens['input_ids']
             attention_mask = tokens['attention_mask']
-            for sequence in token_sequences:
-                self.token_count += len(sequence)
-                self.loss_token_count += len(sequence) - 1  # can't count first token, is not generated as a part of
-                # evaluation
-            energy_recorder.start()
+            self.token_count += attention_mask.sum().item() # only count unmasked tokens
+            self.loss_token_count += attention_mask[:, 1:].sum().item()  # can't count first token, is not generated as a part of the prediction
+            self.energy_recorder.start()
             predicted = self.func(self.instance, *args, **kwargs)
-            energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
+            energy_usage_mj, execution_time_ms, temperature = self.energy_recorder.end().get_metrics()
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
             self.batch_count += 1
             self.temperature = temperature
-            average_time_per_token_ms = self.execution_time_ms / self.token_count
-            average_energy_per_token_mj = self.energy_usage_mj / self.token_count
+            if self.token_count > 0:
+                average_time_per_token_ms = self.execution_time_ms / self.token_count
+                average_energy_per_token_mj = self.energy_usage_mj / self.token_count
+            else:
+                average_time_per_token_ms = 0
+                average_energy_per_token_mj = 0
             logger.debug(
                 f"batch_count={self.batch_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
-                f"energy_usage={self.energy_usage_mj / 1000:.2f} j")
+                f"energy_usage={self.energy_usage_mj:.2f} mj")
             logger.debug(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
-                f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} j")
+                f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} mj")
             logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
             logger.debug(f"Reserved Memory: {torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
             
             # ***** Perplexity *****
             logits = predicted.logits
-            labels = token_sequences.clone()  # labels are derived from input
+            labels = token_sequences.detach()  # labels are derived from input, detach to avoid affecting gradients
             labels = labels[:, 1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
             # for it
             labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length],
-            # in preperation for cross_entroy calculation
+            # in preparation for cross_entropy calculation
             logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
             logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size *
             # sequence_length, vocab_size]
             per_token_loss = functional.cross_entropy(logits, labels, reduction='none')  # vector of per token losses
-            attention_mask_vector = attention_mask[:, 1:].reshape(-1).contiguous()
+            attention_mask_vector = attention_mask[:, 1:].reshape(-1).contiguous().to(logits.device)
             token_losses = per_token_loss * attention_mask_vector  # apply the attention mask to remove padding,
             # which can skew perplexity measurements
             self.aggregate_loss += token_losses.sum()
-            perplexity = torch.exp(self.aggregate_loss / self.loss_token_count)
+            if self.loss_token_count > 0:
+                perplexity = torch.exp(self.aggregate_loss / self.loss_token_count)
+            else:
+                perplexity = torch.tensor(float('nan'))
             logger.debug(f'Perplexity: {perplexity}')
             metrics_manager().perplexity(perplexity.item())
             # ***** Update Metrics Snapshot *****
@@ -213,10 +215,6 @@ def capture_evaluation(func):
             return predicted
     
     def wrapper(self, *args, **kwargs):
-        # Lazily create a CaptureEvaluation instance if it doesn't exist
-        if not hasattr(self, '_capture_evaluation'):
-            self._capture_evaluation = CaptureEvaluation(self)
-        
-        return self._capture_evaluation.capture(*args, **kwargs)
+        return CaptureEvaluation(self).capture(*args, **kwargs)
     
     return wrapper

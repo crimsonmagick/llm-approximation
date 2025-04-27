@@ -34,7 +34,9 @@ def generate_layer_energy_metrics(layer_name, layer_energy_per_batch):
             energy_min = min(energies_sorted)
             energy_mean = mean(energies_sorted)
             energy_median = median(energies_sorted)
-            energy_std_dev = stdev(energies_sorted)
+            if len(energies_sorted) > 1:
+                energy_std_dev = stdev(energies_sorted)
+            else: energy_std_dev = energies_sorted[0]
             
             print(f"layer={layer_name}, batch={batch_idx}, energy_mean={energy_mean}\n"
                   f"layer={layer_name}, batch={batch_idx}, energy_median={energy_median}\n"
@@ -193,7 +195,7 @@ def main():
         print(f'Memory Allocation for {report_name}')
         print(pd.DataFrame({"Layer Index": report['layers'], "Allocated Memory (%)": memory_allocated}))
     
-    plt.ylim(99.63, 99.64)  # Adjust the y-axis limits to zoom into the range of interest
+    plt.ylim(99.00, 100)  # Adjust the y-axis limits to zoom into the range of interest
     plt.title("Allocated Memory for Model After Attention Head Pruning")
     plt.xlabel("Layer Index")
     plt.ylabel("Allocated Memory Compared to Baseline (Percent)")
