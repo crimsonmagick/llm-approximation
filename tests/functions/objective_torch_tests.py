@@ -31,9 +31,9 @@ class ObjectiveTorchTests(unittest.TestCase):
         torch.testing.assert_close(expected_cross_entropy, cross_entropy)
     
     def test_cross_entropy_masked(self):
-        sequence_count = 5
-        sequence_length = 10
-        vocabulary_size = 12
+        sequence_count = 8
+        sequence_length = 20
+        vocabulary_size = 17
         
         # Add masks at the beginning and end of the sequence
         mask_1_start = 0
