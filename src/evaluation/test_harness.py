@@ -6,9 +6,6 @@ import os
 import torch
 from typing import Final
 
-import torch.nn.functional as functional
-from transformers.modeling_outputs import CausalLMOutputWithPast
-
 from llm_type import LLMType
 from src.evaluation.head_pruner import HeadPruningTester
 from src.metrics.metrics import metrics_manager

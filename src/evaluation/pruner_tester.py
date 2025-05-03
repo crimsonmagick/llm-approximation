@@ -1,5 +1,5 @@
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
-from transformers import AutoTokenizer, LlamaForCausalLM
+from transformers import AutoTokenizer
 
 import torch
 

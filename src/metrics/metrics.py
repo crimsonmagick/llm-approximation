@@ -6,7 +6,8 @@ import torch
 
 import pynvml
 from torch import tensor
-from torch.nn import functional
+
+from .function import objective
 
 logger = logging.getLogger(__name__)
 
@@ -155,10 +156,10 @@ def capture_evaluation(func):
         
         def capture(self, *args, **kwargs):
             tokens = args[0]
-            token_sequences: tensor = tokens['input_ids']
+            input_ids: tensor = tokens['input_ids']
             attention_mask = tokens['attention_mask']
-            self.token_count += attention_mask.sum().item() # only count unmasked tokens
-            self.loss_token_count += attention_mask[:, 1:].sum().item()  # can't count first token, is not generated as a part of the prediction
+            self.token_count = attention_mask.sum().item() # only count unmasked tokens
+            self.loss_token_count = attention_mask[:, 1:].sum().item()  # can't count first token, is not generated as a part of the prediction
             self.energy_recorder.start()
             predicted = self.func(self.instance, *args, **kwargs)
             energy_usage_mj, execution_time_ms, temperature = self.energy_recorder.end().get_metrics()
@@ -181,28 +182,8 @@ def capture_evaluation(func):
             logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
             logger.debug(f"Reserved Memory: {torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
             
-            # ***** Perplexity *****
-            logits = predicted.logits
-            labels = token_sequences.detach()  # labels are derived from input, detach to avoid affecting gradients
-            labels = labels[:, 1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
-            # for it
-            labels = labels.view(-1)  # Flatten the labels to a vector, [batch_size * labels_sequence_length],
-            # in preparation for cross_entropy calculation
-            logits = logits[:, :-1].contiguous()  # Last logit has no label to compare with
-            logits = logits.view(-1, logits.size(-1))  # Flatten the logits to a matrix [batch_size *
-            # sequence_length, vocab_size]
-            per_token_loss = functional.cross_entropy(logits, labels, reduction='none')  # vector of per token losses
-            attention_mask_vector = attention_mask[:, 1:].reshape(-1).contiguous().to(logits.device)
-            token_losses = per_token_loss * attention_mask_vector  # apply the attention mask to remove padding,
-            # which can skew perplexity measurements
-            self.aggregate_loss += token_losses.sum()
-            if self.loss_token_count > 0:
-                perplexity = torch.exp(self.aggregate_loss / self.loss_token_count)
-            else:
-                perplexity = torch.tensor(float('nan'))
-            logger.debug(f'Perplexity: {perplexity}')
-            metrics_manager().perplexity(perplexity.item())
-            # ***** Update Metrics Snapshot *****
+            token_losses = objective.cross_entropy(input_ids, attention_mask, predicted.logits)
+            perplexity = objective.aggregate_perplexity(token_losses, self.loss_token_count)
             
             metrics_manager() \
                 .execution_time_ms(self.execution_time_ms) \
@@ -211,7 +192,7 @@ def capture_evaluation(func):
                 .average_energy_per_token_mj(average_energy_per_token_mj) \
                 .allocated_memory(torch.cuda.memory_allocated()) \
                 .temperature(temperature) \
-                .perplexity(perplexity.item())
+                .perplexity(perplexity)
             return predicted
     
     def wrapper(self, *args, **kwargs):
