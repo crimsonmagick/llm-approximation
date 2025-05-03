@@ -3,7 +3,7 @@ from torch import Tensor
 from torch.nn import functional
 
 
-def cross_entropy(input_ids: Tensor, attention_mask: Tensor, logits: Tensor) -> float:
+def cross_entropy(input_ids: Tensor, attention_mask: Tensor, logits: Tensor) -> Tensor:
     labels = input_ids.detach()  # labels are derived from input, detach to avoid affecting gradients
     labels_trimmed = labels[:, 1:].contiguous()  # Drop the first label - it isn't useful as no logits are generated
     # for it
