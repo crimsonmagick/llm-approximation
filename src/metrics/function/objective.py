@@ -1,9 +1,9 @@
 from . import objective_torch as func_torch
 
 
-def aggregate_perplexity(losses, token_count: int):
+def aggregate_perplexity(losses, token_count: int) -> float:
     if _is_torch(losses):
-        return func_torch.aggregate_perplexity(losses, token_count).item()
+        return func_torch.aggregate_perplexity(losses, token_count)
     else:
         _raise_error()
 

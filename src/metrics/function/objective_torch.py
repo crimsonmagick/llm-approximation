@@ -19,10 +19,10 @@ def cross_entropy(input_ids: Tensor, attention_mask: Tensor, logits: Tensor) -> 
     return per_id_loss * attention_mask_flattened
 
 
-def aggregate_perplexity(losses: Tensor, token_count: int) -> Tensor:
-    aggregate_loss = losses.sum()
-    if token_count > 0:
-        perplexity = torch.exp(aggregate_loss / token_count)
+def aggregate_perplexity(losses: Tensor, token_count: int) -> float:
+    if losses is None or losses.numel() == 0 or not token_count:
+        perplexity = float('nan')
     else:
-        perplexity = torch.tensor(float('nan'))
+        aggregate_loss = losses.sum()
+        perplexity = torch.exp(aggregate_loss / token_count).item()
     return perplexity
