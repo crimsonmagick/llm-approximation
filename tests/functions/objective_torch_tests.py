@@ -7,14 +7,16 @@ from src.metrics.function import objective_torch as module_under_test
 from tests.util.torch.device import get_device
 from tests.util.torch.test_data import load_tensor, save_tensor
 
-GENERATOR_SEED = 12
 
 
 class ObjectiveTorchTests(unittest.TestCase):
     
     def setUp(self) -> None:
-        self.generator = torch.Generator().manual_seed(GENERATOR_SEED)
         self.device = get_device()
+        generator_seed = 12 # arbitrary
+        # TODO support generators for different devices - need to save multiple versions of expected tensors
+        self.generator_device = torch.device("cpu")
+        self.generator = torch.Generator(device=self.generator_device).manual_seed(generator_seed)
     
     def test_cross_entropy_no_mask(self):
         sequence_count = 5
@@ -53,13 +55,15 @@ class ObjectiveTorchTests(unittest.TestCase):
 
 
     def rand_logits(self, sequence_count, sequence_length, vocabulary_size) -> Tensor:
-        return (torch.rand(sequence_count, sequence_length, vocabulary_size,
-                           generator=self.generator, device=self.device) - 0.5) * 10
+        logits = (torch.rand(sequence_count, sequence_length, vocabulary_size,
+                           generator=self.generator, device=self.generator_device) - 0.5) * 10
+        return logits.to(device = self.device)
+
 
 
     def rand_labels(self, sequence_count, sequence_length, vocabulary_size) -> Tensor:
-        return torch.randint(0, vocabulary_size, size=(sequence_count, sequence_length), generator=self.generator,
-                             device=self.device)
+        labels = torch.randint(0, vocabulary_size, size=(sequence_count, sequence_length), generator=self.generator, device=self.generator_device)
+        return labels.to(device = self.device)
 
 
 if __name__ == '__main__':
