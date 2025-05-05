@@ -3,7 +3,7 @@ import time
 
 from datasets import load_dataset
 from large_language_model_service import get_model
-from src.metrics.metrics import metrics_manager
+from src.metrics import metrics_manager
 
 
 class HeadPruningTester:
@@ -33,13 +33,13 @@ class HeadPruningTester:
             start = time.time()
             self.transformer.predict(tokens)
             print(f"test_case={test_case}, batch_index={batch_index}, evaluation_timne={time.time() - start}\n")
-            metrics_manager().save_metrics(test_case + f'batch{batch_index}')
+            metrics_manager.save_metrics(test_case + f'batch{batch_index}')
     
     def prune_heads(self, layer_idx, head_idxs):
         self.pruned_head_idxs = head_idxs
         self.pruned_layer_idx = layer_idx
         self.transformer.model.prune_heads({layer_idx: head_idxs})
-        metrics_manager().layer_idx(layer_idx).head_idxs(head_idxs)
+        metrics_manager.layer_idx(layer_idx).head_idxs(head_idxs)
         return self
     
     def num_layers(self):
@@ -59,5 +59,5 @@ class HeadPruningTester:
         self.pruned_layer_idx = None
         self.pruned_head_idxs = None
         self.transformer = get_model(model_type, model_path, supports_pruning)
-        metrics_manager().clear()
+        metrics_manager.clear()
         return self

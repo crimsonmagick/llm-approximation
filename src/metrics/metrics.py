@@ -3,13 +3,9 @@ import logging
 from .energy.energy_recording import EnergyRecorder
 from .function import objective
 from .memory import get_allocated_memory
-from . import metrics_manager as mm
+from . import metrics_manager
 
 logger = logging.getLogger(__name__)
-
-
-def metrics_manager():
-    return mm
 
 
 def capture_evaluation(func):
@@ -54,7 +50,7 @@ def capture_evaluation(func):
             token_losses = objective.cross_entropy(input_ids, attention_mask, predicted.logits)
             perplexity = objective.aggregate_perplexity(token_losses, self.loss_token_count)
             
-            metrics_manager() \
+            metrics_manager \
                 .execution_time_ms(self.execution_time_ms) \
                 .total_energy(self.energy_usage_mj) \
                 .average_time_per_token_ms(average_time_per_token_ms) \

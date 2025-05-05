@@ -8,7 +8,7 @@ from typing import Final
 
 from llm_type import LLMType
 from src.evaluation.head_pruner import HeadPruningTester
-from src.metrics.metrics import metrics_manager
+from src.metrics import metrics_manager
 
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ def write_to_csv(output_path: str):
     
     with open(output_path, 'w') as file:
         writer = csv.writer(file)
-        writer.writerows(metrics_manager().get_metrics())
+        writer.writerows(metrics_manager.get_metrics())
 
 
 if __name__ == '__main__':
@@ -167,7 +167,7 @@ if __name__ == '__main__':
                   model_path=args.model_path, layer_range=layer_range,
                   runs_per_layer=args.runs_per_layer)
         write_to_csv(args.output_path + '-forward.csv')
-        metrics_manager().clear_saved()
+        metrics_manager.clear_saved()
         run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
                   model_path=args.model_path, layer_range=layer_range,
                   reverse_eval=True,
