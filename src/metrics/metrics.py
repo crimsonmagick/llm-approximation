@@ -3,100 +3,16 @@ import logging
 from .energy.energy_recording import EnergyRecorder
 from .function import objective
 from .memory import get_allocated_memory
+from . import metrics_manager as mm
 
 logger = logging.getLogger(__name__)
 
 
-class MetricsManager:
-    def __init__(self):
-        self._perplexity = None
-        self._execution_time_ms = None
-        self._average_energy_per_token_mj = None
-        self._average_time_per_token_ms = None
-        self._total_energy = None
-        self._allocated_memory = None
-        self._layer_idx = None
-        self._head_idxs = None
-        self._temperature = None
-        self._saved_metrics = dict()
-        self.header = (
-            'label',
-            'layer_idx',
-            'head_idxs',
-            'perplexity',
-            'average_energy_per_token_mj',
-            'average_time_per_token_ms',
-            'allocated_memory',
-            'temperature'
-        )
-    
-    def clear(self):
-        self._perplexity = None
-        self._execution_time_ms = None
-        self._average_energy_per_token_mj = None
-        self._average_time_per_token_ms = None
-        self._total_energy = None
-        self._allocated_memory = None
-        self._layer_idx = None
-        self._head_idxs = None
-    
-    def clear_saved(self):
-        self._saved_metrics = dict()
-    
-    def perplexity(self, perplexity):
-        self._perplexity = perplexity
-        return self
-    
-    def execution_time_ms(self, execution_time_ms):
-        self._execution_time_ms = int(execution_time_ms)
-        return self
-    
-    def average_energy_per_token_mj(self, average_energy_per_token_mj):
-        self._average_energy_per_token_mj = average_energy_per_token_mj
-        return self
-    
-    def average_time_per_token_ms(self, average_time_per_token_ms):
-        self._average_time_per_token_ms = average_time_per_token_ms
-        return self
-    
-    def total_energy(self, total_energy):
-        self._total_energy = total_energy
-        return self
-    
-    def allocated_memory(self, allocated_memory):
-        self._allocated_memory = allocated_memory
-        return self
-    
-    def temperature(self, temperature):
-        self._temperature = temperature
-        return self
-    
-    def layer_idx(self, layer_idx):
-        self._layer_idx = layer_idx
-        return self
-    
-    def head_idxs(self, head_idxs):
-        self._head_idxs = head_idxs
-        return self
-    
-    def save_metrics(self, label):
-        self._saved_metrics[label] = (
-            label, self._layer_idx, self._head_idxs, self._perplexity, self._average_energy_per_token_mj,
-            self._average_time_per_token_ms, self._allocated_memory, self._temperature)
-        return self
-    
-    def get_metrics(self):
-        return [self.header] + list(self._saved_metrics.values())
-
-
-_singleton = MetricsManager()
-
 def metrics_manager():
-    return _singleton
+    return mm
 
 
 def capture_evaluation(func):
-    
     class CaptureEvaluation:
         def __init__(self, instance):
             self.aggregate_loss = 0
@@ -113,8 +29,9 @@ def capture_evaluation(func):
             tokens = args[0]
             input_ids = tokens['input_ids']
             attention_mask = tokens['attention_mask']
-            self.token_count = attention_mask.sum().item() # only count unmasked tokens
-            self.loss_token_count = attention_mask[:, 1:].sum().item()  # can't count first token, is not generated as a part of the prediction
+            self.token_count = attention_mask.sum().item()  # only count unmasked tokens
+            self.loss_token_count = attention_mask[:,
+                                    1:].sum().item()  # can't count first token, is not generated as a part of the prediction
             self.energy_recorder.start()
             predicted = self.func(self.instance, *args, **kwargs)
             energy_usage_mj, execution_time_ms, temperature = self.energy_recorder.end().get_metrics()
