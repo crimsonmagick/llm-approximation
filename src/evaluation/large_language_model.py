@@ -6,7 +6,7 @@ import torch
 
 from llm_type import LLMType
 from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
-from src.metrics.metrics import capture_evaluation
+from src.metrics.capture import capture_evaluation
 from transformers import AutoTokenizer, LlamaForCausalLM
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy

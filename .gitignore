@@ -1,4 +1,5 @@
 .idea
+.venv
 csv
 __pycache__
 generated
