@@ -1,13 +1,8 @@
-import atexit
 import logging
-import time
 
-import torch
-
-import pynvml
-from torch import tensor
-
+from .energy.energy_recording import EnergyRecorder
 from .function import objective
+from .memory import get_allocated_memory
 
 logger = logging.getLogger(__name__)
 
@@ -94,49 +89,10 @@ class MetricsManager:
         return [self.header] + list(self._saved_metrics.values())
 
 
-singleton = MetricsManager()
-pynvml.nvmlInit()
-atexit.register(pynvml.nvmlShutdown)
+_singleton = MetricsManager()
 
 def metrics_manager():
-    return singleton
-
-
-class EnergyRecorder:
-    def __init__(self):
-        self.end_time = None
-        self.end_energy = None
-        self.start_energy = None
-        self.start_time = None
-        self.temperature = None
-        self.handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # in a simple consumer setup, GPU will be 0
-    
-    def start(self):
-        self.start_energy = self.__get_total_energy()
-        self.start_time = time.time()
-        self.end_energy = None
-        self.end_time = None
-        self.temperature = None
-        return self
-    
-    def __get_total_energy(self):
-        return pynvml.nvmlDeviceGetTotalEnergyConsumption(self.handle)
-    
-    def __get_gpu_temperature(self):
-        return pynvml.nvmlDeviceGetTemperature(self.handle, pynvml.NVML_TEMPERATURE_GPU)
-    
-    def end(self):
-        self.end_energy = self.__get_total_energy()
-        self.end_time = time.time()
-        self.temperature = self.__get_gpu_temperature()
-        return self
-    
-    def get_metrics(self):
-        if self.end_energy is None or self.end_time is None:
-            return 0, 0
-        energy_consumed_mj = self.end_energy - self.start_energy
-        duration = self.end_time - self.start_time
-        return energy_consumed_mj, duration * 1000, self.temperature
+    return _singleton
 
 
 def capture_evaluation(func):
@@ -147,7 +103,6 @@ def capture_evaluation(func):
             self.token_count = 0
             self.loss_token_count = 0
             self.execution_time_ms = 0
-            self.batch_count = 0
             self.func = func
             self.instance = instance
             self.energy_usage_mj = 0
@@ -156,7 +111,7 @@ def capture_evaluation(func):
         
         def capture(self, *args, **kwargs):
             tokens = args[0]
-            input_ids: tensor = tokens['input_ids']
+            input_ids = tokens['input_ids']
             attention_mask = tokens['attention_mask']
             self.token_count = attention_mask.sum().item() # only count unmasked tokens
             self.loss_token_count = attention_mask[:, 1:].sum().item()  # can't count first token, is not generated as a part of the prediction
@@ -165,7 +120,6 @@ def capture_evaluation(func):
             energy_usage_mj, execution_time_ms, temperature = self.energy_recorder.end().get_metrics()
             self.energy_usage_mj += energy_usage_mj
             self.execution_time_ms += execution_time_ms
-            self.batch_count += 1
             self.temperature = temperature
             if self.token_count > 0:
                 average_time_per_token_ms = self.execution_time_ms / self.token_count
@@ -174,13 +128,11 @@ def capture_evaluation(func):
                 average_time_per_token_ms = 0
                 average_energy_per_token_mj = 0
             logger.debug(
-                f"batch_count={self.batch_count}, execution_time={self.execution_time_ms / 1000:.2f} s, "
+                f"execution_time={self.execution_time_ms / 1000:.2f} s, "
                 f"energy_usage={self.energy_usage_mj:.2f} mj")
             logger.debug(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
                 f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} mj")
-            logger.debug(f"Allocated Memory: {torch.cuda.memory_allocated() / 1024 ** 2:.2f} MB")
-            logger.debug(f"Reserved Memory: {torch.cuda.memory_reserved() / 1024 ** 2:.2f} MB")
             
             token_losses = objective.cross_entropy(input_ids, attention_mask, predicted.logits)
             perplexity = objective.aggregate_perplexity(token_losses, self.loss_token_count)
@@ -190,7 +142,7 @@ def capture_evaluation(func):
                 .total_energy(self.energy_usage_mj) \
                 .average_time_per_token_ms(average_time_per_token_ms) \
                 .average_energy_per_token_mj(average_energy_per_token_mj) \
-                .allocated_memory(torch.cuda.memory_allocated()) \
+                .allocated_memory(get_allocated_memory()) \
                 .temperature(temperature) \
                 .perplexity(perplexity)
             return predicted
