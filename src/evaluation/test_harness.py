@@ -24,7 +24,8 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
     tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
-    tester.transformer_under_test(transformer_type, model_path, True)
+    
+    tester.transformer_under_test(transformer_type, model_path, True, "baseline")
     
     num_heads = tester.num_attention_heads()
     if layer_range is not None:
@@ -52,24 +53,22 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     
     for layer in layers:
         
+        label = f'pruned-{layer}-all'
         # prune all heads, then ever other head
-        tester \
-            .transformer_under_test(transformer_type, model_path, True) \
-            .prune_heads(layer, list(range(num_heads)))
+        tester.transformer_under_test(transformer_type, model_path, True, label,
+                                      layer_idx=layer, head_idxs=list(range(num_heads)))
         
         for run_idx in range(runs_per_layer):
             logger.info(f"Evaluating all heads pruned for layer={layer}, run={run_idx}")
             clear_memory()
             tester.batch_evaluate(f'pruned-{layer}-all-{run_idx}')
         
-        tester \
-            .transformer_under_test(transformer_type, model_path, True) \
-            .prune_heads(layer, list(range(0, num_heads, 2)))
+        tester.transformer_under_test(transformer_type, model_path, True, label,
+                                      layer_idx=layer, head_idxs=list(range(0, num_heads, 2)))
         for run_idx in range(runs_per_layer):
             logger.info(f"Evaluating every other head pruned for layer={layer}, run={run_idx}")
             clear_memory()
             tester.batch_evaluate(f'pruned-{layer}-every-other-{run_idx}')
-            
 
 
 def test_baseline(batch_size: int, evaluation_row_count: int,
@@ -79,7 +78,7 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
     tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
     for run_idx in range(runs_per_layer):
         logger.info(f"Testing baseline, run={run_idx}")
-        tester.transformer_under_test(transformer_type, model_path, True) \
+        tester.transformer_under_test(transformer_type, model_path, True, "baseline") \
             .batch_evaluate(f'baseline-{run_idx}')
 
 

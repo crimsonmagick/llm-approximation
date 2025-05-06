@@ -1,6 +1,6 @@
 import string
 
-from large_language_model import LargeLanguageModelFacade, LlamaFacade, TorchLlamaLoaderFacade
+from src.evaluation.large_language_model import LargeLanguageModelFacade, LlamaFacade, TorchLlamaLoaderFacade
 from llm_type import LLMType
 
 def get_model(llm_type: LLMType, path: string, pruned=False) -> LargeLanguageModelFacade:

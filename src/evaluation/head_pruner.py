@@ -1,9 +1,8 @@
-import string
 import time
 
 from datasets import load_dataset
 from large_language_model_service import get_model
-from src.metrics import metrics_manager
+from src.metrics.capture import instrument
 
 
 class HeadPruningTester:
@@ -33,14 +32,6 @@ class HeadPruningTester:
             start = time.time()
             self.transformer.predict(tokens)
             print(f"test_case={test_case}, batch_index={batch_index}, evaluation_timne={time.time() - start}\n")
-            metrics_manager.save_metrics(test_case + f'batch{batch_index}')
-    
-    def prune_heads(self, layer_idx, head_idxs):
-        self.pruned_head_idxs = head_idxs
-        self.pruned_layer_idx = layer_idx
-        self.transformer.model.prune_heads({layer_idx: head_idxs})
-        metrics_manager.layer_idx(layer_idx).head_idxs(head_idxs)
-        return self
     
     def num_layers(self):
         return self.transformer.model.config.num_hidden_layers
@@ -52,12 +43,15 @@ class HeadPruningTester:
         config = self.transformer.model.config
         return config.num_attention_heads // config.num_key_value_heads
     
-    def transformer_under_test(self, model_type, model_path: string,
-                               supports_pruning: bool):
+    def transformer_under_test(self, model_type, model_path: str,
+                               supports_pruning: bool, label: str, layer_idx: int = None,
+                               head_idxs: list = None):
         del self.transformer
         self.supports_pruning = supports_pruning
-        self.pruned_layer_idx = None
-        self.pruned_head_idxs = None
-        self.transformer = get_model(model_type, model_path, supports_pruning)
-        metrics_manager.clear()
+        self.pruned_layer_idx = layer_idx
+        self.pruned_head_idxs = head_idxs
+        self.transformer = instrument(get_model(model_type, model_path, supports_pruning),
+                                      label, layer_idx, head_idxs)
+        if layer_idx is not None and head_idxs is not None and len(head_idxs) > 0:
+            self.transformer.model.prune_heads({layer_idx: head_idxs})
         return self
