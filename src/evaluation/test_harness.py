@@ -6,8 +6,8 @@ import os
 import torch
 from typing import Final
 
-from llm_type import LLMType
 from src.evaluation.head_pruner import HeadPruningTester
+from src.evaluation.model_resolution import LLMType
 from src.metrics import metrics_manager
 
 logging.basicConfig(level=logging.INFO, force=True)
@@ -23,9 +23,9 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
-    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+    tester = HeadPruningTester(model_path, dataset, batch_size, evaluation_row_count)
     
-    tester.transformer_under_test(transformer_type, model_path, True, "baseline")
+    tester.transformer_under_test(transformer_type, True, "baseline")
     
     num_heads = tester.num_attention_heads()
     if layer_range is not None:
@@ -47,15 +47,17 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     logger.info(f"num_gpus={num_gpus}")
     
     # run baseline first
+    print("test baseline")
     for run_idx in range(runs_per_layer):
         clear_memory()
         tester.batch_evaluate(f'baseline-{run_idx}')
+    print("tested baseline")
     
     for layer in layers:
         
         label = f'pruned-{layer}-all'
         # prune all heads, then ever other head
-        tester.transformer_under_test(transformer_type, model_path, True, label,
+        tester.transformer_under_test(transformer_type, True, label,
                                       layer_idx=layer, head_idxs=list(range(num_heads)))
         
         for run_idx in range(runs_per_layer):
@@ -63,7 +65,7 @@ def run_tests(batch_size: int, evaluation_row_count: int,
             clear_memory()
             tester.batch_evaluate(f'pruned-{layer}-all-{run_idx}')
         
-        tester.transformer_under_test(transformer_type, model_path, True, label,
+        tester.transformer_under_test(transformer_type, True, label,
                                       layer_idx=layer, head_idxs=list(range(0, num_heads, 2)))
         for run_idx in range(runs_per_layer):
             logger.info(f"Evaluating every other head pruned for layer={layer}, run={run_idx}")
@@ -75,10 +77,10 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
                   model_path='meta-llama/Meta-Llama-3-8B', runs_per_layer=1):
     transformer_type: Final[LLMType] = LLMType.LLAMA_3
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
-    tester = HeadPruningTester(dataset, batch_size, evaluation_row_count)
+    tester = HeadPruningTester(model_path, dataset, batch_size, evaluation_row_count)
     for run_idx in range(runs_per_layer):
         logger.info(f"Testing baseline, run={run_idx}")
-        tester.transformer_under_test(transformer_type, model_path, True, "baseline") \
+        tester.transformer_under_test(transformer_type, True, "baseline") \
             .batch_evaluate(f'baseline-{run_idx}')
 
 

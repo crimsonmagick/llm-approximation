@@ -1,21 +1,22 @@
 import logging
 
+from torch import nn
+
 from .energy.energy_recording import EnergyRecorder
 from .function import objective
 from .memory import get_allocated_memory
 from . import metrics_manager
 from .metrics_manager import MetricsCapture
-from src.evaluation.large_language_model import LargeLanguageModelFacade
 
 logger = logging.getLogger(__name__)
 
 
 def instrument(model, label, layer_idx, head_idxs):
-    if isinstance(model, LargeLanguageModelFacade):
-        model.predict = _capture_evaluation(model.predict, label, layer_idx, head_idxs)
-        return model
+    if isinstance(model, nn.Module):
+        model.forward = _capture_evaluation(model.forward, label, layer_idx, head_idxs)
     else:
-        raise TypeError("Only LargeLanguageModelFacade is supported")
+        raise TypeError("Only derivatives of nn.Module are supported")
+    return model
 
 
 def _capture_evaluation(func, label, layer_idx, head_idxs):
@@ -26,9 +27,8 @@ def _capture_evaluation(func, label, layer_idx, head_idxs):
             self.invocation_count = 0
         
         def capture(self, *args, **kwargs):
-            tokens = args[0]
-            input_ids = tokens['input_ids']
-            attention_mask = tokens['attention_mask']
+            input_ids = kwargs['input_ids']
+            attention_mask = kwargs['attention_mask']
             token_count = attention_mask.sum().item()  # only count unmasked tokens
             # can't count first token, is not generated as a part of the prediction
             loss_token_count = attention_mask[:, 1:].sum().item()
