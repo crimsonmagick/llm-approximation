@@ -14,7 +14,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/evaluation/test_harness.py" />
-    <option name="PARAMETERS" value="--model-path=$USER_HOME$/ai/models/Meta-Llama-3-8B/ --batch-size=5 --output-path=csv/home-5-4-2025-1 --eval-rows=5 --runs-per-layer=1 --layer-range=0-1" />
+    <option name="PARAMETERS" value="--model-path=$USER_HOME$/ai/models/Meta-Llama-3-8B/ --batch-size=5 --output-path=csv/home-5-2025-2 --eval-rows=5 --runs-per-layer=20 --layer-range=0-1" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

@@ -4,13 +4,12 @@ from typing import NamedTuple, List
 
 class MetricsCapture(NamedTuple):
     label: str
+    layer_idx: int
+    head_idxs: List[int]
     perplexity: float
-    execution_time_ms: float
     average_energy_per_token_mj: float
     average_time_per_token_ms: float
     allocated_memory: float
-    layer_idx: int
-    head_idxs: List[int]
     temperature: float
 
 

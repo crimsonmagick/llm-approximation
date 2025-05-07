@@ -10,54 +10,28 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def add_entry(metric_by_layer, layer_idx, batch_idx, entry):
-    if layer_idx not in metric_by_layer:
-        metric_by_layer[layer_idx] = list()
-    metric_by_batch = metric_by_layer[layer_idx]
-    while len(metric_by_batch) <= batch_idx:
-        metric_by_batch.append(list())
-    metric_by_batch[batch_idx].append(entry)
-
-
-def flatten(metric_by_batch):
-    return [metric for batch_list in
-            metric_by_batch for metric in
-            batch_list]
-
-
-def generate_layer_energy_metrics(layer_name, layer_energy_per_batch):
-    if len(layer_energy_per_batch) > 1:
-        for batch_idx in range(len(layer_energy_per_batch)):
-            energies_sorted = sorted(layer_energy_per_batch[batch_idx])
-            
-            energy_max = max(energies_sorted)
-            energy_min = min(energies_sorted)
-            energy_mean = mean(energies_sorted)
-            energy_median = median(energies_sorted)
-            if len(energies_sorted) > 1:
-                energy_std_dev = stdev(energies_sorted)
-            else: energy_std_dev = energies_sorted[0]
-            
-            print(f"layer={layer_name}, batch={batch_idx}, energy_mean={energy_mean}\n"
-                  f"layer={layer_name}, batch={batch_idx}, energy_median={energy_median}\n"
-                  f"layer={layer_name}, batch={batch_idx}, energy_min={energy_min}\n"
-                  f"layer={layer_name}, batch={batch_idx}, energy_max={energy_max}\n"
-                  f"layer={layer_name}, batch={batch_idx}, range={energy_max - energy_min}\n"
-                  f"layer={layer_name}, batch={batch_idx}, energy_std_dev={energy_std_dev}")
+def generate_layer_energy_metrics(layer_name, layer_energy):
+    if len(layer_energy) > 1:
+        energies_sorted = sorted(layer_energy)
+        
+        energy_max = max(energies_sorted)
+        energy_min = min(energies_sorted)
+        energy_mean = mean(energies_sorted)
+        energy_median = median(energies_sorted)
+        if len(energies_sorted) > 1:
+            energy_std_dev = stdev(energies_sorted)
+        else:
+            energy_std_dev = energies_sorted[0]
+        
+        print(f"layer={layer_name}, energy_mean={energy_mean}\n"
+              f"layer={layer_name}, energy_median={energy_median}\n"
+              f"layer={layer_name}, energy_min={energy_min}\n"
+              f"layer={layer_name}, energy_max={energy_max}\n"
+              f"layer={layer_name}, range={energy_max - energy_min}\n"
+              f"layer={layer_name}, energy_std_dev={energy_std_dev}")
+    else:
+        print(f"Warning: more than one value required for generating energy metrics for layer={layer_name}")
     
-    aggregate_energies_sorted = [energy for batch_list in layer_energy_per_batch for energy in batch_list]
-    energy_max = max(aggregate_energies_sorted)
-    energy_min = min(aggregate_energies_sorted)
-    energy_mean = mean(aggregate_energies_sorted)
-    energy_median = median(aggregate_energies_sorted)
-    energy_std_dev = stdev(aggregate_energies_sorted)
-    print(f"layer_name={layer_name}, aggregate_energy_mean={energy_mean}\n"
-          f"layer_name={layer_name}, aggregate_energy_median={energy_median}\n"
-          f"layer_name={layer_name}, aggregate_energy_min={energy_min}\n"
-          f"layer_name={layer_name}, aggregate_energy_max={energy_max}\n"
-          f"layer_name={layer_name}, aggregate_range={energy_max - energy_min}\n"
-          f"layer_name={layer_name}, aggregate_energy_std_dev={energy_std_dev}")
-
 
 def generate_stat_report(input_path: str, report_name: str):
     # Read and process the CSV file
@@ -80,35 +54,42 @@ def generate_stat_report(input_path: str, report_name: str):
             test_energy = float(row['average_energy_per_token_mj'])
             test_time = float(row['average_time_per_token_ms'])
             test_memory = int(row['allocated_memory'])
-            label = row['label']
-            batch_idx = int(label[len(label) - 1])
             
-            add_entry(perplexity_by_layer, layer_idx, batch_idx, test_perplexity)
-            add_entry(energy_by_layer, layer_idx, batch_idx, test_energy)
-            add_entry(time_by_layer, layer_idx, batch_idx, test_time)
-            add_entry(memory_by_layer, layer_idx, batch_idx, test_memory)
+            if layer_idx not in perplexity_by_layer:
+                perplexity_by_layer[layer_idx] = []
+            if layer_idx not in energy_by_layer:
+                energy_by_layer[layer_idx] = []
+            if layer_idx not in time_by_layer:
+                time_by_layer[layer_idx] = []
+            if layer_idx not in memory_by_layer:
+                memory_by_layer[layer_idx] = []
+                
+            perplexity_by_layer[layer_idx].append(test_perplexity)
+            energy_by_layer[layer_idx].append(test_energy)
+            time_by_layer[layer_idx].append(test_time)
+            memory_by_layer[layer_idx].append(test_memory)
     
     # generate baseline stats per batch
     generate_layer_energy_metrics('baseline', energy_by_layer['baseline'])
     
     # generate baseline means
-    perplexities_baseline = flatten(perplexity_by_layer.pop('baseline'))
+    perplexities_baseline = perplexity_by_layer.pop('baseline')
     perplexity_baseline_mean = mean(perplexities_baseline)
-    energy_baseline = flatten(energy_by_layer.pop('baseline'))
+    energy_baseline = energy_by_layer.pop('baseline')
     energy_baseline_mean = mean(energy_baseline)
-    time_baseline = flatten(time_by_layer.pop('baseline'))
+    time_baseline = time_by_layer.pop('baseline')
     time_baseline_mean = mean(time_baseline)
-    memory_baseline = flatten(memory_by_layer.pop('baseline'))
+    memory_baseline = memory_by_layer.pop('baseline')
     memory_baseline_mean = mean(memory_baseline)
     
     # Normalize and store final values
     layers = sorted(perplexity_by_layer.keys(), key=lambda x: int(x))
     for layer_idx in layers:
         generate_layer_energy_metrics(layer_idx, energy_by_layer[layer_idx])
-        perplexities.append((perplexity_baseline_mean / mean(flatten(perplexity_by_layer[layer_idx]))) * 100)
-        energy_per_token.append(mean(flatten(energy_by_layer[layer_idx])) / energy_baseline_mean * 100)
-        time_per_token.append(mean(flatten(time_by_layer[layer_idx])) / time_baseline_mean * 100)
-        memory_allocated.append(mean(flatten(memory_by_layer[layer_idx])) / memory_baseline_mean * 100)
+        perplexities.append((perplexity_baseline_mean / mean(perplexity_by_layer[layer_idx])) * 100)
+        energy_per_token.append(mean(energy_by_layer[layer_idx]) / energy_baseline_mean * 100)
+        time_per_token.append(mean(time_by_layer[layer_idx]) / time_baseline_mean * 100)
+        memory_allocated.append(mean(memory_by_layer[layer_idx]) / memory_baseline_mean * 100)
     
     return {
         "report_name": report_name,

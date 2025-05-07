@@ -54,14 +54,14 @@ def _capture_evaluation(func, label, layer_idx, head_idxs):
             
             token_losses = objective.cross_entropy(input_ids, attention_mask, predicted.logits)
             perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
+            allocated_memory = get_allocated_memory()
             
             captured_metrics = MetricsCapture(
-                label=f'label-{self.invocation_count}',
+                allocated_memory=allocated_memory,
+                label=f'{label}-{self.invocation_count}',
                 perplexity=perplexity,
-                execution_time_ms=execution_time_ms,
                 average_energy_per_token_mj=average_energy_per_token_mj,
                 average_time_per_token_ms=average_time_per_token_ms,
-                allocated_memory=get_allocated_memory(),
                 temperature=temperature,
                 layer_idx=layer_idx,
                 head_idxs=head_idxs
