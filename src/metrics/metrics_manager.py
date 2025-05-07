@@ -1,4 +1,3 @@
-import sys
 from typing import NamedTuple, List
 
 
@@ -31,10 +30,12 @@ def clear_saved():
     _saved_metrics = dict()
 
 
-def get_metrics():
-    return [_header] + list(_saved_metrics.values())
+def get_metrics(suite='default'):
+    return [_header] + list(_saved_metrics.setdefault(suite, dict()).values())
 
 
-def save_metrics(captured: MetricsCapture):
-    _saved_metrics[captured.label] = captured
-    return sys.modules[__name__]
+def accept(captured: MetricsCapture, suite='default'):
+    if _saved_metrics.get(suite) is None:
+        _saved_metrics[suite] = dict()
+    suite_metrics = _saved_metrics[suite]
+    suite_metrics[captured.label] = captured

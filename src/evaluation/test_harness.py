@@ -25,7 +25,7 @@ def run_tests(batch_size: int, evaluation_row_count: int,
     dataset: Final[tuple] = ("Salesforce/wikitext", 'wikitext-2-v1')
     tester = HeadPruningTester(model_path, dataset, batch_size, evaluation_row_count)
     
-    tester.transformer_under_test(transformer_type, True, "baseline")
+    tester.transformer_under_test(transformer_type, True, "baseline", suite='forward')
     
     num_heads = tester.num_attention_heads()
     if layer_range is not None:
@@ -57,7 +57,7 @@ def run_tests(batch_size: int, evaluation_row_count: int,
         
         label = f'pruned-{layer}-all'
         # prune all heads, then ever other head
-        tester.transformer_under_test(transformer_type, True, label,
+        tester.transformer_under_test(transformer_type, True, label, 'forward',
                                       layer_idx=layer, head_idxs=list(range(num_heads)))
         
         for run_idx in range(runs_per_layer):
@@ -65,7 +65,7 @@ def run_tests(batch_size: int, evaluation_row_count: int,
             clear_memory()
             tester.batch_evaluate(f'pruned-{layer}-all-{run_idx}')
         
-        tester.transformer_under_test(transformer_type, True, label,
+        tester.transformer_under_test(transformer_type, True, label, 'reverse',
                                       layer_idx=layer, head_idxs=list(range(0, num_heads, 2)))
         for run_idx in range(runs_per_layer):
             logger.info(f"Evaluating every other head pruned for layer={layer}, run={run_idx}")
@@ -80,7 +80,7 @@ def test_baseline(batch_size: int, evaluation_row_count: int,
     tester = HeadPruningTester(model_path, dataset, batch_size, evaluation_row_count)
     for run_idx in range(runs_per_layer):
         logger.info(f"Testing baseline, run={run_idx}")
-        tester.transformer_under_test(transformer_type, True, "baseline") \
+        tester.transformer_under_test(transformer_type, True, "baseline", 'forward') \
             .batch_evaluate(f'baseline-{run_idx}')
 
 
@@ -90,7 +90,7 @@ def clear_memory():
     torch.cuda.synchronize()
 
 
-def write_to_csv(output_path: str):
+def write_to_csv(output_path: str, suite: str):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     with open(output_path, 'w') as file:
@@ -162,15 +162,14 @@ if __name__ == '__main__':
         test_baseline(batch_size=args.batch_size,
                       evaluation_row_count=args.eval_rows,
                       model_path=args.model_path, runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-baseline.csv')
+        write_to_csv(args.output_path + '-baseline.csv', 'forward')
     else:
         run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
                   model_path=args.model_path, layer_range=layer_range,
                   runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-forward.csv')
-        metrics_manager.clear_saved()
+        write_to_csv(args.output_path + '-forward.csv', 'forward')
         run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
                   model_path=args.model_path, layer_range=layer_range,
                   reverse_eval=True,
                   runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-reverse.csv')
+        write_to_csv(args.output_path + '-reverse.csv', 'reverse')

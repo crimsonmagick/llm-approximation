@@ -55,14 +55,14 @@ class HeadPruningTester:
         config = self.transformer.model.config
         return config.num_attention_heads // config.num_key_value_heads
     
-    def transformer_under_test(self, model_type, supports_pruning: bool, label: str,
+    def transformer_under_test(self, model_type, supports_pruning: bool, label: str, suite: str,
                                layer_idx: int = None, head_idxs: list = None):
         del self.transformer
         self.supports_pruning = supports_pruning
         self.pruned_layer_idx = layer_idx
         self.pruned_head_idxs = head_idxs
         self.transformer = instrument(get_model(model_type, self.model_path, supports_pruning),
-                                      label, layer_idx, head_idxs)
+                                      label, layer_idx, head_idxs, suite)
         if layer_idx is not None and head_idxs is not None and len(head_idxs) > 0:
             self.transformer.prune_heads({layer_idx: head_idxs})
         return self

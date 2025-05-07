@@ -11,7 +11,7 @@ from .metrics_manager import MetricsCapture
 logger = logging.getLogger(__name__)
 
 
-def instrument(model, label, layer_idx, head_idxs):
+def instrument(model, label, layer_idx, head_idxs, suite='default'):
     if isinstance(model, nn.Module):
         model.forward = _capture_evaluation(model.forward, label, layer_idx, head_idxs)
     else:
@@ -19,7 +19,7 @@ def instrument(model, label, layer_idx, head_idxs):
     return model
 
 
-def _capture_evaluation(func, label, layer_idx, head_idxs):
+def _capture_evaluation(func, label, layer_idx, head_idxs, suite='default'):
     class CaptureEvaluation:
         def __init__(self):
             self.func = func
@@ -66,7 +66,7 @@ def _capture_evaluation(func, label, layer_idx, head_idxs):
                 layer_idx=layer_idx,
                 head_idxs=head_idxs
             )
-            metrics_manager.save_metrics(captured_metrics)
+            metrics_manager.accept(captured_metrics, suite=suite)
             
             self.invocation_count += 1
             return predicted
