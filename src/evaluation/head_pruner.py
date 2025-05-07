@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
-from model_resolution import get_model
+from src.evaluation.model_resolution import get_model
 from src.metrics.capture import instrument
 
 
@@ -40,7 +40,6 @@ class HeadPruningTester:
             input_ids = tokens['input_ids']
             attention_mask = tokens['attention_mask']
             
-            # print(f"prompts={prompts}")
             start = time.time()
             with torch.no_grad():
                 self.transformer(input_ids=input_ids, attention_mask=attention_mask)
