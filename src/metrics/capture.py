@@ -11,15 +11,15 @@ from .metrics_manager import MetricsCapture
 logger = logging.getLogger(__name__)
 
 
-def instrument(model, label, layer_idx, head_idxs, suite='default'):
+def instrument(model, label, layer_idx, head_idxs, suite):
     if isinstance(model, nn.Module):
-        model.forward = _capture_evaluation(model.forward, label, layer_idx, head_idxs)
+        model.forward = _capture_evaluation(model.forward, label, layer_idx, head_idxs, suite)
     else:
         raise TypeError("Only derivatives of nn.Module are supported")
     return model
 
 
-def _capture_evaluation(func, label, layer_idx, head_idxs, suite='default'):
+def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
     class CaptureEvaluation:
         def __init__(self):
             self.func = func

@@ -3,7 +3,7 @@ import unittest
 import torch
 from torch import tensor
 
-from src.llama.models.modeling_pruned_llama import PrunedLlamaSdpaAttention
+from src.models.llama import PrunedLlamaSdpaAttention
 from transformers.models.llama.modeling_llama import repeat_kv
 
 

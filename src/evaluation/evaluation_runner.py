@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
-from src.evaluation.model_resolution import get_model
+from src.models.model_resolution import get_model
 from src.metrics.capture import instrument
 
 

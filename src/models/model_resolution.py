@@ -4,7 +4,7 @@ from enum import Enum
 from torch import bfloat16
 from transformers import PreTrainedModel
 
-from src.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
+from src.models.llama.models.modeling_pruned_llama import PrunedLlamaForCausalLM
 
 
 class LLMType(Enum):
