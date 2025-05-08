@@ -2,7 +2,8 @@ import argparse
 
 import torch
 
-from src.evaluation.evaluation_harness import evaluate_baseline, write_to_csv, run_tests
+from src.evaluation.evaluation_scenario import EvaluationScenario
+from src.models.model_resolution import LLMType
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -65,17 +66,19 @@ if __name__ == '__main__':
         layer_range = None
     
     if args.baseline:
-        evaluate_baseline(batch_size=args.batch_size,
-                          evaluation_row_count=args.eval_rows,
-                          model_path=args.model_path, runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-baseline.csv', 'forward')
+        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                           evaluation_row_count=args.eval_rows, scenario_name='baselineonly',
+                           supports_attn_pruning=True) \
+            .runner(results_path=args.output_path + '-baseline.csv') \
+            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
     else:
-        run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-                  model_path=args.model_path, layer_range=layer_range,
-                  runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-forward.csv', 'forward')
-        run_tests(batch_size=args.batch_size, evaluation_row_count=args.eval_rows,
-                  model_path=args.model_path, layer_range=layer_range,
-                  reverse_eval=True,
-                  runs_per_layer=args.runs_per_layer)
-        write_to_csv(args.output_path + '-reverse.csv', 'reverse')
+        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                           evaluation_row_count=args.eval_rows, scenario_name='forward',
+                           supports_attn_pruning=True, layer_range=layer_range) \
+            .runner(results_path=args.output_path + '-forward.csv') \
+            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
+        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                           evaluation_row_count=args.eval_rows, scenario_name='reverse',
+                           supports_attn_pruning=True, layer_range=layer_range) \
+            .runner(results_path=args.output_path + '-reverse.csv') \
+            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
