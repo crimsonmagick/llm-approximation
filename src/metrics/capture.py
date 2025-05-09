@@ -2,11 +2,11 @@ import logging
 
 from torch import nn
 
-from .energy.energy_recording import EnergyRecorder
-from .function import objective
-from .memory import get_allocated_memory
-from . import metrics_manager
-from .metrics_manager import MetricsCapture
+from src.metrics.energy.energy_recording import EnergyRecorder
+from src.metrics.function import objective
+from src.metrics.memory import get_allocated_memory
+from src.metrics import metrics_manager
+from src.metrics.metrics_manager import MetricsCapture
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,6 @@ def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
             energy_recorder.start()
             predicted = self.func(*args, **kwargs)
             energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
-            energy_usage_mj += energy_usage_mj
-            execution_time_ms += execution_time_ms
-            temperature = temperature
             if token_count > 0:
                 average_time_per_token_ms = execution_time_ms / token_count
                 average_energy_per_token_mj = energy_usage_mj / token_count

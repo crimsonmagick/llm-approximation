@@ -4,10 +4,10 @@ from unittest.mock import patch
 import torch
 
 from src.metrics.function import objective as module_under_test
-from tests.functions.test_objective_mixin import ObjectiveTestsMixin
+from tests.util.test_util_mixin import TestUtilMixin
 
 
-class ObjectiveTorchTests(ObjectiveTestsMixin, unittest.TestCase):
+class TestUtil(TestUtilMixin, unittest.TestCase):
     
     @patch("src.metrics.function.objective_torch.cross_entropy")
     def test_cross_entropy_torch_called(self, mock_cross_entropy):

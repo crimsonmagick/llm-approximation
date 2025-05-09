@@ -3,11 +3,11 @@ import unittest
 import torch
 
 from src.metrics.function import objective_torch as module_under_test
-from tests.functions.test_objective_mixin import ObjectiveTestsMixin
-from tests.util.torch.test_data import load_tensor
+from tests.util.test_util_mixin import TestUtilMixin
+from tests.util.torch_utils.test_data import load_tensor
 
 
-class ObjectiveTorchTests(ObjectiveTestsMixin, unittest.TestCase):
+class TestUtil(TestUtilMixin, unittest.TestCase):
     
     def test_cross_entropy_no_mask(self):
         sequence_count = 5
