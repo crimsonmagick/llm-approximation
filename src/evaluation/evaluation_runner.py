@@ -2,7 +2,6 @@ import csv
 import gc
 import logging
 import os
-import time
 
 import torch
 from datasets import load_dataset
@@ -86,12 +85,8 @@ class EvaluationRunner:
                 input_ids = tokens['input_ids']
                 attention_mask = tokens['attention_mask']
                 
-                start = time.time()
                 with torch.no_grad():
                     model(input_ids=input_ids, attention_mask=attention_mask)
-                logger.info(
-                    f"evaluation_name={self.scenario_name}, batch_index={batch_index}, "
-                    f"run_idx={run_idx}, evaluation_time={time.time() - start}")
     
     def _tokenize(self, prompt):
         return self.tokenizer(prompt, return_tensors='pt', padding=PaddingStrategy.LONGEST, padding_side='left',
