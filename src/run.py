@@ -73,10 +73,15 @@ if __name__ == '__main__':
             .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
     else:
         EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                           evaluation_row_count=args.eval_rows, scenario_name='forward',
-                           supports_attn_pruning=True, layer_range=layer_range) \
-            .runner(results_path=args.output_path + '-forward.csv') \
-            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
+                           evaluation_row_count=args.eval_rows, scenario_name='baselineonly',
+                           supports_attn_pruning=True) \
+            .runner(results_path=args.output_path + '-baseline.csv') \
+            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
+        # EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+        #                    evaluation_row_count=args.eval_rows, scenario_name='forward',
+        #                    supports_attn_pruning=True, layer_range=layer_range) \
+        #     .runner(results_path=args.output_path + '-forward.csv') \
+        #     .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
         EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
                            evaluation_row_count=args.eval_rows, scenario_name='reverse',
                            supports_attn_pruning=True, layer_range=layer_range) \
