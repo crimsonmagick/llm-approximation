@@ -54,6 +54,12 @@ if __name__ == '__main__':
         default=1,
         help='Number of repeated runs per pruned layer (and baseline). Defaults to 1.'
     )
+    parser.add_argument(
+        '--warmup-runs',
+        type=int,
+        default=0,
+        help='Number of warmup runs. Defaults to 0.'
+    )
     
     if not torch.cuda.is_available():
         raise Exception("Cuda is currently the only supported platform.")
@@ -72,11 +78,12 @@ if __name__ == '__main__':
             .runner(results_path=args.output_path + '-baseline.csv') \
             .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
     else:
-        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                           evaluation_row_count=args.eval_rows, scenario_name='baselineonly',
-                           supports_attn_pruning=True) \
-            .runner(results_path=args.output_path + '-baseline.csv') \
-            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
+        if args.warmup_runs > 0:
+            EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                               evaluation_row_count=args.eval_rows, scenario_name='baselinewarmup',
+                               supports_attn_pruning=True) \
+                .runner(results_path=args.output_path + '-warmup.csv') \
+                .evaluate(batch_size=args.batch_size, num_runs=args.warmup_runs, baseline_only=True)
         EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
                            evaluation_row_count=args.eval_rows, scenario_name='forward',
                            supports_attn_pruning=True, layer_range=layer_range) \
