@@ -25,7 +25,7 @@ class EvaluationRunner:
                  device='cuda', num_heads, llm_type, results_path: str):
         self.model_path = model_path
         self.test_data = load_dataset(*dataset_path)["test"].filter(
-            lambda ex: ex["text"] and ex["text"].strip() != ""
+            lambda ex: ex["text"] and len(ex["text"].strip()) > 500
         )
         self.evaluation_size_rows = evaluation_row_count
         self.scenario_name = scenario_name

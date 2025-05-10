@@ -42,12 +42,12 @@ def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
             else:
                 average_time_per_token_ms = 0
                 average_energy_per_token_mj = 0
-            logger.debug(
-                f"execution_time={execution_time_ms / 1000:.2f} s, "
+            logger.info(
+                f"execution_time={execution_time_ms:.2f} ms, "
                 f"energy_usage={energy_usage_mj:.2f} mj")
-            logger.debug(
+            logger.info(
                 f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
-                f"average_energy_per_token_mj={average_energy_per_token_mj / 1000:.2f} mj")
+                f"average_energy_per_token_mj={average_energy_per_token_mj :.2f} mj")
             
             token_losses = objective.cross_entropy(input_ids, attention_mask, predicted.logits)
             perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
