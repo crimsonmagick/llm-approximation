@@ -45,7 +45,8 @@ class EvaluationRunner:
         model = instrument(get_model(self.model_type, self.model_path, self.supports_attn_pruning),
                            'baseline', None, None, self.scenario_name)
         num_baseline_runs = num_runs if baseline_only else 2 * num_runs
-        self._evaluate_model(model, batch_size, num_baseline_runs)
+        label = "warmup" if baseline_only else "baseline"
+        self._evaluate_model(model, batch_size, num_baseline_runs, label)
         
         if self.supports_attn_pruning and not baseline_only:
             for layer_idx in layers:
@@ -58,7 +59,7 @@ class EvaluationRunner:
                 model.prune_heads({layer_idx: head_idxs})
                 
                 logger.info(f"Evaluating all heads pruned for layer={layer_idx}")
-                self._evaluate_model(model, batch_size, num_runs)
+                self._evaluate_model(model, batch_size, num_runs, label)
                 
                 # prune every other head
                 head_idxs = list(range(0, self.num_heads, 2))
@@ -69,14 +70,16 @@ class EvaluationRunner:
                 model.prune_heads({layer_idx: head_idxs})
                 
                 logger.info(f"Evaluating every other head pruned for layer={layer_idx}")
-                self._evaluate_model(model, batch_size, num_runs)
+                self._evaluate_model(model, batch_size, num_runs, label)
         self._write_to_csv(self.results_path)
     
-    def _evaluate_model(self, model, batch_size, number_of_runs):
+    def _evaluate_model(self, model, batch_size, number_of_runs, label):
         num_batches = (self.evaluation_size_rows + batch_size - 1) // batch_size
         for run_idx in range(number_of_runs):
             self._clear_memory()
             for batch_index in range(num_batches):
+                logger.info(
+                    f"{self.scenario_name}-{label}: Evaluating run={run_idx}/{number_of_runs}, batch={batch_index + 1}/{num_batches}")
                 start_idx = batch_index * batch_size
                 end_idx = min(start_idx + batch_size, self.evaluation_size_rows)
                 batch = self.test_data.select(range(start_idx, end_idx))
