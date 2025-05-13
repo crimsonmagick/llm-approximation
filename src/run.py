@@ -2,7 +2,7 @@ import argparse
 
 import torch
 
-from src.evaluation.evaluation_scenario import EvaluationScenario
+from src.evaluation.scenario import EvaluationScenario
 from src.models.model_resolution import LLMType
 
 if __name__ == '__main__':
