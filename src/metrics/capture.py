@@ -6,7 +6,7 @@ from src.metrics.energy.energy_recording import EnergyRecorder
 from src.metrics.function import objective
 from src.metrics.memory import get_allocated_memory
 from src.metrics import metrics_manager
-from src.metrics.metrics_manager import MetricsCapture
+from src.metrics.metrics_manager import EnergyCapture
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
             energy_recorder = EnergyRecorder()
             energy_recorder.start()
             predicted = self.func(*args, **kwargs)
-            energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
+            energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_energy_metrics()
             if token_count > 0:
                 average_time_per_token_ms = execution_time_ms / token_count
                 average_energy_per_token_mj = energy_usage_mj / token_count
@@ -53,7 +53,7 @@ def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
             perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
             allocated_memory = get_allocated_memory()
             
-            captured_metrics = MetricsCapture(
+            captured_metrics = EnergyCapture(
                 allocated_memory=allocated_memory,
                 label=f'{label}-{self.invocation_count}',
                 perplexity=perplexity,
@@ -63,7 +63,7 @@ def _capture_evaluation(func, label, layer_idx, head_idxs, suite):
                 layer_idx=layer_idx,
                 head_idxs=head_idxs
             )
-            metrics_manager.accept(captured_metrics, suite=suite)
+            metrics_manager.accept_energy(captured_metrics, suite=suite)
             
             self.invocation_count += 1
             return predicted

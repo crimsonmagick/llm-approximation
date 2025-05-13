@@ -6,7 +6,7 @@ from torch import nn
 from types import SimpleNamespace
 
 from src.metrics.capture import instrument
-from src.metrics.metrics_manager import MetricsCapture
+from src.metrics.metrics_manager import EnergyCapture
 from tests.util.test_util_mixin import TestUtilMixin
 
 SEQUENCE_COUNT = 6
@@ -44,7 +44,7 @@ class CaptureTests(TestUtilMixin, unittest.TestCase):
         expected_time_ms = 240
         expected_energy_mj = 300
         expected_temperature_c = 52
-        energy_recorder_instance.end.return_value.get_metrics.return_value \
+        energy_recorder_instance.end.return_value.get_energy_metrics.return_value \
             = (expected_energy_mj, expected_time_ms, expected_temperature_c)
         
         stubbed_prediction = SimpleNamespace(logits=expected_logits)
@@ -62,7 +62,7 @@ class CaptureTests(TestUtilMixin, unittest.TestCase):
         
         args, kwargs = mock_accept.call_args
         suite: str = kwargs['suite']
-        metrics: MetricsCapture = args[0]
+        metrics: EnergyCapture = args[0]
         
         token_count = SEQUENCE_COUNT * SEQUENCE_LENGTH
         
