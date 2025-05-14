@@ -16,24 +16,23 @@ class Evaluation:
 
     def __init__(self, *, model_path: str, scenario_name: str,
                  supports_attn_pruning: bool, device, repetitions,
-                 tokens_by_batch, llm_type: LLMType, label):
+                 llm_type: LLMType, label):
         self.scenario_name = scenario_name
         self.device = device
         self.repetitions = repetitions
-        self.tokens_by_batch = tokens_by_batch
         self.label = label
         self.llm_type = llm_type
         self.model_path = model_path
         self.supports_attn_pruning = supports_attn_pruning
         self.model = self._get_model()
 
-    def evaluate(self, tokens):
-        num_batches = len(self.tokens_by_batch)
-        input_ids = tokens['input_ids']
-        attention_mask = tokens['attention_mask']
+    def evaluate(self, tokens_by_batch):
+        num_batches = len(tokens_by_batch)
         for run_idx in range(self.repetitions):
             self._clear_memory()
-            for batch_index, tokens in enumerate(self.tokens_by_batch):
+            for batch_index, tokens in enumerate(tokens_by_batch):
+                input_ids = tokens['input_ids']
+                attention_mask = tokens['attention_mask']
                 logger.info(
                     f"{self.scenario_name}-{self.label}: Evaluating run={run_idx}/{self.repetitions}, batch={batch_index + 1}/{num_batches}")
 
