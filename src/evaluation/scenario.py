@@ -157,7 +157,6 @@ class EvaluationScenario:
             evaluation = deferred_evaluation()
             evaluation.evaluate(tokens_by_batch)
             del evaluation
-
         del tokens_by_batch
         return self
 

@@ -53,10 +53,10 @@ class Evaluation:
 
 class PrunedEvaluation(Evaluation):
 
-    def __init__(self, layer_idx: int, pruning_strategy, **kwargs):
+    def __init__(self, *, layer_idx: int, pruning_strategy, **kwargs):
         self.layer_idx = layer_idx
         self.pruning_strategy = pruning_strategy
-        super.__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _get_model(self):
         model = super()._get_model()
