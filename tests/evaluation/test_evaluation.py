@@ -4,11 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, Mock
 
 from torch import nn
-from torch.fx.experimental.unification.dispatch import namespace
 
-from src.evaluation.evaluation import Evaluation, PrunedEvaluation
+from src.evaluation.evaluation import Evaluation, PrunedEvaluation, EnergyEvaluation
 from src.evaluation.pruning import PruningStrategy
 from src.models.model_resolution import LLMType, resolve_model
+from tests.util.test_util_mixin import TestUtilMixin
+
+
+SEQUENCE_COUNT = 6
+SEQUENCE_LENGTH = 11
+VOCABULARY_SIZE = 23
 
 
 def pack(tokens_by_batch):
@@ -19,7 +24,7 @@ def pack(tokens_by_batch):
     return batches
 
 
-class EvaluationTests(unittest.TestCase):
+class EvaluationTests(TestUtilMixin, unittest.TestCase):
 
     def test_base_evaluation(self):
         with ExitStack() as stack:
@@ -90,6 +95,44 @@ class EvaluationTests(unittest.TestCase):
             mock_resolve_model.assert_called_once()
             self.assertEqual(mock_model, pruning_strategy.call_args[0][0])
             self.assertEqual(mock_pruned_model, under_test.model)
+
+
+    def test_energy_evaluation(self):
+        with ExitStack() as stack:
+            mock_model = Mock(nn.Module)
+            mock_resolve_model = stack.enter_context(patch('src.evaluation.evaluation.resolve_model'))
+            mock_resolve_model.return_value = mock_model
+
+            model_path = "test/path/model"
+            scenario_name = "base-scenario"
+            supports_attn_pruning = True
+            device = "testdevice"
+            repetitions = 5
+            label = 'base-test-label'
+            llm_type = LLMType.LLAMA_3
+
+            under_test: EnergyEvaluation = EnergyEvaluation(model_path=model_path, scenario_name=scenario_name,
+                                                      supports_attn_pruning=supports_attn_pruning,
+                                                      device=device, repetitions=repetitions, llm_type=llm_type, label=label)
+
+            mock_energy_recorder = stack.enter_context(patch("src.metrics.capture.EnergyRecorder"))
+            energy_recorder_instance = mock_energy_recorder.return_value
+            energy_recorder_instance.start.return_value = None
+            expected_time_ms = 240
+            expected_energy_mj = 300
+            expected_temperature_c = 52
+            energy_recorder_instance.end.return_value.get_energy_metrics.return_value \
+                = (expected_energy_mj, expected_time_ms, expected_temperature_c)
+
+
+            stubbed_prediction = SimpleNamespace(logits=expected_logits)
+            model = Mock(spec=nn.Module)
+            model.forward.return_value = stubbed_prediction
+
+            input_ids = self.rand_labels(SEQUENCE_COUNT, SEQUENCE_LENGTH, VOCABULARY_SIZE)
+            attention_mask = torch.ones(SEQUENCE_COUNT, SEQUENCE_LENGTH)
+            mock_resolve_model.assert_called_once()
+            self.assertEqual(mock_model, under_test.model)
 
 
 if __name__ == '__main__':
