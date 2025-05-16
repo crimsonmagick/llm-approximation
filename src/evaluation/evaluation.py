@@ -28,6 +28,7 @@ class Evaluation:
 
     def evaluate(self, tokens_by_batch):
         num_batches = len(tokens_by_batch)
+        predictions = []
         for run_idx in range(self.repetitions):
             self._clear_memory()
             for batch_index, tokens in enumerate(tokens_by_batch):
@@ -38,7 +39,9 @@ class Evaluation:
 
                 with torch.no_grad():
                     prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        return prediction
+                    if run_idx == self.repetitions - 1:
+                        predictions.append(prediction)
+        return predictions
 
     def _get_model(self):
         return resolve_model(self.llm_type, self.model_path,
@@ -65,12 +68,14 @@ class PrunedEvaluation(Evaluation):
 
 class EnergyEvaluation(Evaluation):
 
-    def evaluate(self, **kwargs):
-        attention_mask = kwargs['attention_mask']
-        token_count = attention_mask.sum().item()  # only count unmasked tokens
+    def evaluate(self, tokens_by_batch):
+        token_count = 0
+        for tokens in tokens_by_batch:
+            attention_mask = tokens['attention_mask']
+            token_count += attention_mask.sum().item()  # only count unmasked tokens
         energy_recorder = EnergyRecorder()
         energy_recorder.start()
-        prediction = super().evaluate(**kwargs)
+        predictions = super().evaluate(tokens_by_batch)
         energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_energy_metrics()
         if token_count > 0:
             average_time_per_token_ms = execution_time_ms / token_count
@@ -89,12 +94,12 @@ class EnergyEvaluation(Evaluation):
             label=self.label,
             average_energy_per_token_mj=average_energy_per_token_mj,
             average_time_per_token_ms=average_time_per_token_ms,
-            layer_idx=self.layer_idx,
-            head_idxs=self.head_idxs
+            layer_idx=self.layer_idx if hasattr(self, 'layer_idx') else None,
+            head_idxs=self.head_idxs if hasattr(self, 'head_idxs') else None
         )
         metrics_manager.accept_energy(captured_metrics, suite=self.scenario_name)
 
-        return prediction
+        return predictions
 
 
 class PerplexityEvaluation(Evaluation):
