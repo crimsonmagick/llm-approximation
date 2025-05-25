@@ -1,15 +1,42 @@
+import inspect
 import unittest
 from contextlib import ExitStack
-from types import SimpleNamespace
+from functools import reduce
 from unittest.mock import patch, MagicMock, Mock
 
 from torch import nn
-from torch.fx.experimental.unification.dispatch import namespace
 
+import src.evaluation.scenario
+from src.evaluation import scenario as scenario_module
+from src.evaluation.evaluation import EnergyEvaluation
 from src.evaluation.scenario import EvaluationScenario
 from src.models.model_resolution import LLMType
 
 EOS_TOKEN = 5
+
+
+class StubEvaluation:
+
+    def __init__(self, *args, **kwargs):
+        self.init_args = (args, kwargs)
+        self.call_args_list = []
+
+    def evaluate(self, tokens_by_batch):
+        self.call_args_list.append([[tokens_by_batch], {}])
+
+
+class StubPrunedEvaluation(StubEvaluation):
+    pass
+
+
+class StubPerplexityEvaluation(StubEvaluation):
+    pass
+
+
+class StubEnergyEvaluation(StubEvaluation):
+    pass
+
+EVALUATION_CLASSES = [StubEvaluation, StubPrunedEvaluation, StubPerplexityEvaluation, StubEnergyEvaluation]
 
 
 class EvaluationTests(unittest.TestCase):
@@ -30,42 +57,77 @@ class EvaluationTests(unittest.TestCase):
         self.mock_manual_seed = self._patch_stack.enter_context(
             patch('src.evaluation.scenario.torch.manual_seed')
         )
-        load_ds = self._patch_stack.enter_context(patch('datasets.load_dataset'))
-        ds_mock = MagicMock()
-        # make __getitem__ return some dummy data
-        ds_mock.__getitem__.return_value = ['z'*501, "short", None]
-        load_ds.return_value = ds_mock
+        mock_load_dataset = self._patch_stack.enter_context(patch('datasets.load_dataset'))
+        mock_dataset = MagicMock()
+        mock_dataset.__getitem__.return_value = ['z' * 501, "short", None]
+        mock_load_dataset.return_value = mock_dataset
 
         self.mock_config = self._patch_stack.enter_context(
             patch('src.evaluation.scenario.AutoConfig.from_pretrained')
         )
-        tok_patcher = patch('src.evaluation.scenario.AutoTokenizer.from_pretrained')
-        self.mock_from_pretrained = self._patch_stack.enter_context(tok_patcher)
+        mock_tokenizer_from_pretrained = patch('src.evaluation.scenario.AutoTokenizer.from_pretrained')
+        self.mock_tokenizer_from_pretrained = self._patch_stack.enter_context(mock_tokenizer_from_pretrained)
         self.mock_tokenizer = MagicMock(eos_token=EOS_TOKEN, pad_token_id=None, pad_token=None)
-        self.mock_from_pretrained.return_value = self.mock_tokenizer
+        self.mock_tokenizer_from_pretrained.return_value = self.mock_tokenizer
 
-    def _create_test_scenario(self, **overrides):
+        self.patched_resolve_model = self._patch_stack.enter_context(patch('src.evaluation.evaluation.resolve_model'))
+        self.mock_model = Mock(nn.Module)
+        self.patched_resolve_model.return_value = self.mock_model
+
+        self.patched_evaluation = self._patch_stack.enter_context(
+            patch('src.evaluation.scenario.Evaluation', new=StubEvaluation))
+        self.patched_perplexity_evaluation = self._patch_stack.enter_context(
+            patch('src.evaluation.scenario.PerplexityEvaluation', new=StubPerplexityEvaluation))
+        self.patched_energy_evaluation = self._patch_stack.enter_context(
+            patch('src.evaluation.scenario.EnergyEvaluation', new=StubEnergyEvaluation))
+        self.patched_pruned_evaluation = self._patch_stack.enter_context(
+            patch('src.evaluation.scenario.PrunedEvaluation', new=StubPrunedEvaluation))
+
+    def _create_scenario(self, **overrides):
         params = {
-            "model_path":             self.model_path,
-            "supports_attn_pruning":  self.supports_attn_pruning,
-            "batch_size":             self.batch_size,
-            "llm_type":               self.llm_type,
-            "evaluation_row_count":   self.evaluation_row_count,
-            "rng_seed":               self.rng_seed,
-            "scenario_name":          self.scenario_name,
-            "dataset":                self.dataset,
-            "device":                 self.device,
+            "model_path": self.model_path,
+            "supports_attn_pruning": self.supports_attn_pruning,
+            "batch_size": self.batch_size,
+            "llm_type": self.llm_type,
+            "evaluation_row_count": self.evaluation_row_count,
+            "rng_seed": self.rng_seed,
+            "scenario_name": self.scenario_name,
+            "dataset": self.dataset,
+            "device": self.device,
         }
         params.update(overrides)
         return EvaluationScenario(**params)
 
-    def test_base_evaluation(self):
-        scenario = self._create_test_scenario()
+    def test_constructor(self):
+        scenario = self._create_scenario()
+        self.assertTrue(EvaluationScenario, type(scenario))
         self.mock_manual_seed.assert_called_once_with(self.rng_seed)
-        self.mock_from_pretrained.assert_called_once_with(
+        self.mock_tokenizer_from_pretrained.assert_called_once_with(
             self.model_path, use_fast=True, device=self.device
         )
         self.assertEqual(EOS_TOKEN, self.mock_tokenizer.pad_token)
+
+    def test_baseline_evaluations(self):
+        for capture_energy, capture_perplexity, expected_repetitions, expected_types in [
+            (False, False, 6, [StubEvaluation]),
+            (True, True, 10, [StubPerplexityEvaluation, StubEnergyEvaluation, StubEvaluation])
+        ]:
+            with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
+                              expected_repetitions=expected_repetitions, expected_types=expected_types):
+                scenario = self._create_scenario()
+                scenario.add_baseline_evaluation(capture_energy, capture_perplexity=capture_perplexity,
+                                                 repetitions=expected_repetitions)
+                self.assertEqual(1, len(scenario.deferred_baseline))
+
+                evaluation = scenario.deferred_baseline[0]()
+                expected_classes_present = reduce(lambda test_success, class_type: isinstance(evaluation, class_type) and test_success, expected_types, True)
+                unexpected_types = [e for e in EVALUATION_CLASSES if e not in expected_types]
+                unexpected_class_present = reduce(lambda test_failure, class_type: isinstance(evaluation, class_type) or test_failure, unexpected_types, False)
+
+                self.assertTrue(expected_classes_present)
+                self.assertFalse(unexpected_class_present)
+
+
 
 if __name__ == '__main__':
     unittest.main()

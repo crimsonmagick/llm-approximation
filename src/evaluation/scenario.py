@@ -49,13 +49,13 @@ class EvaluationScenario:
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
 
-    def baseline_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
-        return self.__non_pruned(capture_energy, capture_perplexity, repetitions, False)
+    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False)
 
-    def warmup_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
-        return self.__non_pruned(capture_energy, capture_perplexity, repetitions, True)
+    def add_warmup_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True)
 
-    def __non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool):
+    def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool):
         chain_of_command: List[Type[Evaluation]] = []
         if capture_perplexity:
             chain_of_command.append(PerplexityEvaluation)
@@ -79,7 +79,7 @@ class EvaluationScenario:
         return self
 
 
-    def add_pruned(self, *, pruning_strategy=None, capture_energy=False, capture_perplexity=False, layer_range=None, evaluation_name, repetitions=1):
+    def add_pruned_evaluation(self, *, pruning_strategy=None, capture_energy=False, capture_perplexity=False, layer_range=None, evaluation_name, repetitions=1):
 
         if layer_range is not None:
             first_layer, final_layer = layer_range
@@ -117,13 +117,9 @@ class EvaluationScenario:
     def __get_default_kwargs(self):
         default_kwargs = dict()
         default_kwargs['model_path'] = self.model_path
-        default_kwargs['dataset'] = self.dataset
-        default_kwargs['evaluation_row_count'] = self.evaluation_row_count
         default_kwargs['scenario_name'] = self.scenario_name
         default_kwargs['supports_attn_pruning'] = self.supports_attn_pruning
         default_kwargs['device'] = self.device
-        default_kwargs['batch_size'] = self.batch_size
-        default_kwargs['tokenizer'] = self.tokenizer
         default_kwargs['llm_type'] = self.llm_type
         return default_kwargs
 
