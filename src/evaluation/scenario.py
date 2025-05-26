@@ -1,5 +1,6 @@
 import logging
-from typing import List, Type
+from functools import partial
+from typing import List, Type, Set
 
 import torch
 from datasets import load_dataset
@@ -13,6 +14,10 @@ from src.models.model_resolution import LLMType
 
 logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
+
+
+class DuplicateEvaluationError(Exception):
+    pass
 
 
 class EvaluationScenario:
@@ -44,6 +49,7 @@ class EvaluationScenario:
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, device=self.device)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.pruned_evaluation_names: Set = set()
 
     @staticmethod
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
@@ -79,9 +85,10 @@ class EvaluationScenario:
             self.deferred_baseline.append(deferred)
         return self
 
-    def add_pruned_evaluation(self, *, pruning_strategy=None, capture_energy=False, capture_perplexity=False,
-                              layer_range=None, evaluation_name, repetitions=1):
-
+    def add_pruned_evaluation(self, *, pruning_strategy, capture_energy, capture_perplexity, layer_range,
+                              evaluation_name, repetitions: int = 1):
+        if evaluation_name in self.pruned_evaluation_names:
+            raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')
         if layer_range is not None:
             first_layer, final_layer = layer_range
         else:
@@ -91,7 +98,7 @@ class EvaluationScenario:
         if (final_layer <= first_layer
                 or final_layer - first_layer > self.config.num_hidden_layers
                 or final_layer < 0 or first_layer < 0):
-            error_message = f"Invalid layer range specified: {layer_range}, model layer_range={self.config.num_layers()}"
+            error_message = f"Invalid layer range specified: {layer_range}, model layer_range={self.config.num_hidden_layers}"
             raise Exception(error_message)
         chain_of_command: List[Type[Evaluation]] = []
         if pruning_strategy is not None:
@@ -107,12 +114,15 @@ class EvaluationScenario:
 
         default_kwargs = self.__get_default_kwargs()
         default_kwargs['repetitions'] = repetitions
+        default_kwargs['pruning_strategy'] = pruning_strategy
 
         for layer_idx in range(first_layer, final_layer + 1):
             label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer{layer_idx}'
             kwargs = default_kwargs.copy()
             kwargs['label'] = label
-            self.deferred_pruned.append(lambda: evaluation_type(**kwargs))
+            kwargs['layer_idx'] = layer_idx
+            self.deferred_pruned.append(partial(evaluation_type, **kwargs))
+        self.pruned_evaluation_names.add(evaluation_name)
         return self
 
     def __get_default_kwargs(self):

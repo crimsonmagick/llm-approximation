@@ -1,11 +1,13 @@
 import unittest
 from contextlib import ExitStack
 from functools import reduce
+from types import SimpleNamespace
 from typing import List, Type
 from unittest.mock import patch, MagicMock, Mock
 
 from torch import nn
 
+from src.evaluation.pruning import PruningStrategy
 from src.evaluation.scenario import EvaluationScenario
 from src.models.model_resolution import LLMType
 
@@ -60,9 +62,15 @@ class EvaluationTests(unittest.TestCase):
         mock_dataset.__getitem__.return_value = ['z' * 501, "short", None]
         mock_load_dataset.return_value = mock_dataset
 
-        self.mock_config = self._patch_stack.enter_context(
+        self.num_attention_heads = 40
+        self.num_hidden_layers = 32
+        self.mock_config = SimpleNamespace(num_attention_heads=self.num_attention_heads,
+                                      num_hidden_layers=self.num_hidden_layers)
+        self.patch_config = self._patch_stack.enter_context(
             patch('src.evaluation.scenario.AutoConfig.from_pretrained')
         )
+        self.patch_config.return_value = self.mock_config
+
         mock_tokenizer_from_pretrained = patch('src.evaluation.scenario.AutoTokenizer.from_pretrained')
         self.mock_tokenizer_from_pretrained = self._patch_stack.enter_context(mock_tokenizer_from_pretrained)
         self.mock_tokenizer = MagicMock(eos_token=EOS_TOKEN, pad_token_id=None, pad_token=None)
@@ -127,6 +135,65 @@ class EvaluationTests(unittest.TestCase):
 
                 expected_label = f'scenario-{self.scenario_name}-baseline-{i}'
                 self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
+
+    def test_warmup_evaluations(self):
+        test_cases = [
+            (False, False, 6, [StubEvaluation]),
+            (True, False, 10, [StubEnergyEvaluation, StubEvaluation]),
+            (False, True, 3, [StubPerplexityEvaluation, StubEvaluation]),
+            (True, True, 99, [StubPerplexityEvaluation, StubEnergyEvaluation, StubEvaluation])
+        ]
+        scenario = self._create_scenario()
+        for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
+            with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
+                              expected_repetitions=expected_repetitions, expected_types=expected_types):
+                scenario.add_warmup_evaluation(capture_energy, capture_perplexity=capture_perplexity,
+                                               repetitions=expected_repetitions)
+                expected_length = i + 1
+                self.assertEqual(expected_length, len(scenario.deferred_warmup))
+
+                evaluation_to_validate = scenario.deferred_warmup[i]()
+
+                self.validate_types(evaluation_to_validate, expected_types)
+
+                expected_label = f'scenario-{self.scenario_name}-warmup-{i}'
+                self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
+
+    def test_pruned_evaluations(self):
+        test_cases = [
+            (False, False, Mock(PruningStrategy), 6, None, [StubEvaluation, StubPrunedEvaluation]),
+            (False, False, None, 9, (0, 3), [StubEvaluation]),
+            (True, False, Mock(PruningStrategy), 10, (4, 9), [StubEnergyEvaluation, StubEvaluation, StubPrunedEvaluation]),
+            (False, True, None, 3, None, [StubPerplexityEvaluation, StubEvaluation]),
+            (True, True, Mock(PruningStrategy), 99, (22, 29),
+             [StubPerplexityEvaluation, StubEnergyEvaluation, StubPrunedEvaluation, StubEvaluation])
+        ]
+        scenario = self._create_scenario()
+        for i, (capture_energy, capture_perplexity, pruning_strategy, expected_repetitions, layer_range, expected_types) \
+                in enumerate(test_cases):
+            with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
+                              pruning_strategy=pruning_strategy, expected_repetitions=expected_repetitions,
+                              layer_range=layer_range, expected_types=expected_types):
+                evaluation_name = f'test_pruned_evaluation_{i}'
+                pruned_start_idx = len(scenario.deferred_pruned)
+                scenario.add_pruned_evaluation(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
+                                               pruning_strategy=pruning_strategy, repetitions=expected_repetitions,
+                                               layer_range=layer_range, evaluation_name=evaluation_name)
+
+                start_layer, end_layer = layer_range if layer_range else (0, self.num_hidden_layers - 1)
+                expected_length = end_layer - start_layer + 1 if layer_range else self.num_hidden_layers
+                deferred_under_validation = scenario.deferred_pruned[pruned_start_idx:]
+                self.assertEqual(expected_length, len(deferred_under_validation))
+
+                for j, layer_idx in enumerate(range(start_layer, end_layer + 1)):
+                    evaluation_to_validate = deferred_under_validation[j]()
+                    self.validate_types(evaluation_to_validate, expected_types)
+                    expected_label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer{layer_idx}'
+                    self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
+                    _, init_kwargs = evaluation_to_validate.init_args
+                    self.assertEqual(pruning_strategy, init_kwargs['pruning_strategy'])
+                    self.assertEqual(layer_idx, init_kwargs['layer_idx'])
+
 
     def validate_common_attributes(self, to_validate: StubEvaluation, expected_repetitions: int, expected_label: str):
         _, init_kwargs = to_validate.init_args
