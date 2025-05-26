@@ -108,7 +108,9 @@ class EvaluationTests(unittest.TestCase):
     def test_baseline_evaluations(self):
         test_cases = [
             (False, False, 6, [StubEvaluation]),
-            (True, True, 10, [StubPerplexityEvaluation, StubEnergyEvaluation, StubEvaluation])
+            (True, False, 10, [StubEnergyEvaluation, StubEvaluation]),
+            (False, True, 3, [StubPerplexityEvaluation, StubEvaluation]),
+            (True, True, 99, [StubPerplexityEvaluation, StubEnergyEvaluation, StubEvaluation])
         ]
         scenario = self._create_scenario()
         for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
