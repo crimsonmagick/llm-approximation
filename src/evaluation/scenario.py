@@ -117,7 +117,7 @@ class EvaluationScenario:
         default_kwargs['pruning_strategy'] = pruning_strategy
 
         for layer_idx in range(first_layer, final_layer + 1):
-            label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer{layer_idx}'
+            label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer-{layer_idx}'
             kwargs = default_kwargs.copy()
             kwargs['label'] = label
             kwargs['layer_idx'] = layer_idx

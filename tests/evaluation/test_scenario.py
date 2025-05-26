@@ -188,7 +188,7 @@ class EvaluationTests(unittest.TestCase):
                 for j, layer_idx in enumerate(range(start_layer, end_layer + 1)):
                     evaluation_to_validate = deferred_under_validation[j]()
                     self.validate_types(evaluation_to_validate, expected_types)
-                    expected_label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer{layer_idx}'
+                    expected_label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer-{layer_idx}'
                     self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
                     _, init_kwargs = evaluation_to_validate.init_args
                     self.assertEqual(pruning_strategy, init_kwargs['pruning_strategy'])
