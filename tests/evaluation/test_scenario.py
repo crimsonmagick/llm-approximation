@@ -119,13 +119,24 @@ class EvaluationTests(unittest.TestCase):
                                                  repetitions=expected_repetitions)
                 self.assertEqual(1, len(scenario.deferred_baseline))
 
-                evaluation = scenario.deferred_baseline[0]()
-                expected_classes_present = reduce(lambda test_success, class_type: isinstance(evaluation, class_type) and test_success, expected_types, True)
+                evaluation_to_validate = scenario.deferred_baseline[0]()
+                expected_classes_present = reduce(lambda test_success, class_type: isinstance(evaluation_to_validate, class_type) and test_success, expected_types, True)
                 unexpected_types = [e for e in EVALUATION_CLASSES if e not in expected_types]
-                unexpected_class_present = reduce(lambda test_failure, class_type: isinstance(evaluation, class_type) or test_failure, unexpected_types, False)
+                unexpected_class_present = reduce(lambda test_failure, class_type: isinstance(evaluation_to_validate, class_type) or test_failure, unexpected_types, False)
 
                 self.assertTrue(expected_classes_present)
                 self.assertFalse(unexpected_class_present)
+                _, init_kwargs = evaluation_to_validate.init_args
+                expected = self
+                self.assertEqual(expected.model_path, init_kwargs['model_path'])
+                self.assertEqual(expected.scenario_name, init_kwargs['scenario_name'])
+                self.assertEqual(expected.supports_attn_pruning, init_kwargs['supports_attn_pruning'])
+                self.assertEqual(expected.device, init_kwargs['device'])
+                self.assertEqual(expected.llm_type, init_kwargs['llm_type'])
+                self.assertEqual(expected_repetitions, init_kwargs['repetitions'])
+                expected_label = f'scenario-{expected.scenario_name}-baseline-0'
+                self.assertEqual(expected_label, init_kwargs['label'])
+
 
 
 

@@ -69,7 +69,8 @@ class EvaluationScenario:
         kwargs = self.__get_default_kwargs()
         kwargs['repetitions'] = repetitions
         label_suffix = 'warmup' if warmup else 'baseline'
-        label = f'scenario-{self.scenario_name}-{label_suffix}'
+        label_count = len(self.deferred_warmup) if warmup else len(self.deferred_baseline)
+        label = f'scenario-{self.scenario_name}-{label_suffix}-{label_count}'
         kwargs['label'] = label
         deferred = lambda: evaluation_type(**kwargs)
         if warmup:
@@ -78,8 +79,8 @@ class EvaluationScenario:
             self.deferred_baseline.append(deferred)
         return self
 
-
-    def add_pruned_evaluation(self, *, pruning_strategy=None, capture_energy=False, capture_perplexity=False, layer_range=None, evaluation_name, repetitions=1):
+    def add_pruned_evaluation(self, *, pruning_strategy=None, capture_energy=False, capture_perplexity=False,
+                              layer_range=None, evaluation_name, repetitions=1):
 
         if layer_range is not None:
             first_layer, final_layer = layer_range
