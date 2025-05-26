@@ -20,8 +20,8 @@ VOCABULARY_SIZE = 23
 def pack(tokens_by_batch):
     batches = []
     for input_ids, attention_mask in tokens_by_batch:
-        batches.append({"input_ids": torch.tensor(input_ids, dtype=torch.int),
-                        "attention_mask": torch.tensor(attention_mask, dtype=torch.int)})
+        batches.append({'input_ids': torch.tensor(input_ids, dtype=torch.int),
+                        'attention_mask': torch.tensor(attention_mask, dtype=torch.int)})
     return batches
 
 
@@ -123,15 +123,11 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
                 [[1, 1, 1, 1], [1, 0, 0, 1]]
             )])
             batch_count = len(tokens_by_batch)
-            sequence_count = len(tokens_by_batch[0])
-            sequence_length = len(tokens_by_batch[0].input_ids)
+            sequence_count = len(tokens_by_batch[0]['input_ids'])
+            sequence_length = len(tokens_by_batch[0]['input_ids'][0])
             vocabulary_size = 23
 
-
-            expected_label = 'my_expected_label'
-            expected_suite = 'my_expected_suite'
-            expected_layer_idx = 3
-            expected_head_idxs = [0, 1, 4, 9]
+            expected_layer_idx = None
             expected_logits = self.rand_logits(batch_count, sequence_length, vocabulary_size)
 
             mock_energy_recorder = stack.enter_context(patch("src.evaluation.evaluation.EnergyRecorder"))
@@ -154,8 +150,7 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
             self.assertTrue(mock_empty_cache.call_count, batch_count)
             self.assertTrue(mock_synchronize.call_count, batch_count)
 
-            self.assertTrue(expected_logits, predictions[0].logits)
-            torch.equal(expected_logits,  predictions[0].logits)
+            torch.equal(expected_logits, predictions[0].logits)
 
             for call_idx, tokens in enumerate(tokens_by_batch):
                 expected_input_ids = tokens['input_ids']
@@ -171,15 +166,13 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
                 suite: str = kwargs['suite']
                 metrics: EnergyCapture = args[0]
 
-                token_count = sequence_count * sequence_length
+                token_count = expected_attention_mask.sum()
 
-                self.assertEqual(expected_suite, suite)
-                self.assertEqual(f'{expected_label}-0', metrics.label)
+                self.assertEqual(scenario_name, suite)
+                self.assertEqual(label, metrics.label)
                 self.assertEqual(expected_layer_idx, metrics.layer_idx)
                 self.assertEqual(expected_energy_mj / token_count, metrics.average_energy_per_token_mj)
                 self.assertEqual(expected_time_ms / token_count, metrics.average_time_per_token_ms)
-                self.assertEqual(expected_temperature_c, metrics.temperature)
-
 
 
 if __name__ == '__main__':

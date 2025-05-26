@@ -55,10 +55,10 @@ class EvaluationScenario:
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
 
-    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+    def add_baseline_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False)
 
-    def add_warmup_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+    def add_warmup_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True)
 
     def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool):
@@ -85,8 +85,8 @@ class EvaluationScenario:
             self.deferred_baseline.append(deferred)
         return self
 
-    def add_pruned_evaluation(self, *, pruning_strategy, capture_energy, capture_perplexity, layer_range,
-                              evaluation_name, repetitions: int = 1):
+    def add_pruned_evaluations(self, *, pruning_strategy, capture_energy, capture_perplexity, layer_range,
+                               evaluation_name, repetitions: int = 1):
         if evaluation_name in self.pruned_evaluation_names:
             raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')
         if layer_range is not None:
@@ -133,9 +133,6 @@ class EvaluationScenario:
         default_kwargs['device'] = self.device
         default_kwargs['llm_type'] = self.llm_type
         return default_kwargs
-
-    def add_warmup(self):
-        return self
 
     def execute(self):
         tokens_by_batch = []

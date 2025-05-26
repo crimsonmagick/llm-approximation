@@ -124,8 +124,8 @@ class EvaluationTests(unittest.TestCase):
         for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
             with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                               expected_repetitions=expected_repetitions, expected_types=expected_types):
-                scenario.add_baseline_evaluation(capture_energy, capture_perplexity=capture_perplexity,
-                                                 repetitions=expected_repetitions)
+                scenario.add_baseline_evaluations(capture_energy, capture_perplexity=capture_perplexity,
+                                                  repetitions=expected_repetitions)
                 expected_length = i + 1
                 self.assertEqual(expected_length, len(scenario.deferred_baseline))
 
@@ -136,7 +136,7 @@ class EvaluationTests(unittest.TestCase):
                 expected_label = f'scenario-{self.scenario_name}-baseline-{i}'
                 self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
 
-    def test_warmup_evaluations(self):
+    def test_add_warmup_evaluations(self):
         test_cases = [
             (False, False, 6, [StubEvaluation]),
             (True, False, 10, [StubEnergyEvaluation, StubEvaluation]),
@@ -147,8 +147,8 @@ class EvaluationTests(unittest.TestCase):
         for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
             with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                               expected_repetitions=expected_repetitions, expected_types=expected_types):
-                scenario.add_warmup_evaluation(capture_energy, capture_perplexity=capture_perplexity,
-                                               repetitions=expected_repetitions)
+                scenario.add_warmup_evaluations(capture_energy, capture_perplexity=capture_perplexity,
+                                                repetitions=expected_repetitions)
                 expected_length = i + 1
                 self.assertEqual(expected_length, len(scenario.deferred_warmup))
 
@@ -159,7 +159,7 @@ class EvaluationTests(unittest.TestCase):
                 expected_label = f'scenario-{self.scenario_name}-warmup-{i}'
                 self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
 
-    def test_pruned_evaluations(self):
+    def test_add_pruned_evaluations(self):
         test_cases = [
             (False, False, Mock(PruningStrategy), 6, None, [StubEvaluation, StubPrunedEvaluation]),
             (False, False, None, 9, (0, 3), [StubEvaluation]),
@@ -176,9 +176,9 @@ class EvaluationTests(unittest.TestCase):
                               layer_range=layer_range, expected_types=expected_types):
                 evaluation_name = f'test_pruned_evaluation_{i}'
                 pruned_start_idx = len(scenario.deferred_pruned)
-                scenario.add_pruned_evaluation(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
-                                               pruning_strategy=pruning_strategy, repetitions=expected_repetitions,
-                                               layer_range=layer_range, evaluation_name=evaluation_name)
+                scenario.add_pruned_evaluations(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
+                                                pruning_strategy=pruning_strategy, repetitions=expected_repetitions,
+                                                layer_range=layer_range, evaluation_name=evaluation_name)
 
                 start_layer, end_layer = layer_range if layer_range else (0, self.num_hidden_layers - 1)
                 expected_length = end_layer - start_layer + 1 if layer_range else self.num_hidden_layers
