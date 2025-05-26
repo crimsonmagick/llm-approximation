@@ -36,6 +36,7 @@ class StubPerplexityEvaluation(StubEvaluation):
 class StubEnergyEvaluation(StubEvaluation):
     pass
 
+
 EVALUATION_CLASSES = [StubEvaluation, StubPrunedEvaluation, StubPerplexityEvaluation, StubEnergyEvaluation]
 
 
@@ -108,21 +109,27 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(EOS_TOKEN, self.mock_tokenizer.pad_token)
 
     def test_baseline_evaluations(self):
-        for capture_energy, capture_perplexity, expected_repetitions, expected_types in [
+        test_cases = [
             (False, False, 6, [StubEvaluation]),
             (True, True, 10, [StubPerplexityEvaluation, StubEnergyEvaluation, StubEvaluation])
-        ]:
+        ]
+        scenario = self._create_scenario()
+        for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
             with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                               expected_repetitions=expected_repetitions, expected_types=expected_types):
-                scenario = self._create_scenario()
                 scenario.add_baseline_evaluation(capture_energy, capture_perplexity=capture_perplexity,
                                                  repetitions=expected_repetitions)
-                self.assertEqual(1, len(scenario.deferred_baseline))
+                expected_length = i + 1
+                self.assertEqual(expected_length, len(scenario.deferred_baseline))
 
-                evaluation_to_validate = scenario.deferred_baseline[0]()
-                expected_classes_present = reduce(lambda test_success, class_type: isinstance(evaluation_to_validate, class_type) and test_success, expected_types, True)
+                evaluation_to_validate = scenario.deferred_baseline[i]()
+                expected_classes_present = reduce(
+                    lambda test_success, class_type: isinstance(evaluation_to_validate, class_type) and test_success,
+                    expected_types, True)
                 unexpected_types = [e for e in EVALUATION_CLASSES if e not in expected_types]
-                unexpected_class_present = reduce(lambda test_failure, class_type: isinstance(evaluation_to_validate, class_type) or test_failure, unexpected_types, False)
+                unexpected_class_present = reduce(
+                    lambda test_failure, class_type: isinstance(evaluation_to_validate, class_type) or test_failure,
+                    unexpected_types, False)
 
                 self.assertTrue(expected_classes_present)
                 self.assertFalse(unexpected_class_present)
@@ -134,10 +141,8 @@ class EvaluationTests(unittest.TestCase):
                 self.assertEqual(expected.device, init_kwargs['device'])
                 self.assertEqual(expected.llm_type, init_kwargs['llm_type'])
                 self.assertEqual(expected_repetitions, init_kwargs['repetitions'])
-                expected_label = f'scenario-{expected.scenario_name}-baseline-0'
+                expected_label = f'scenario-{expected.scenario_name}-baseline-{i}'
                 self.assertEqual(expected_label, init_kwargs['label'])
-
-
 
 
 if __name__ == '__main__':
