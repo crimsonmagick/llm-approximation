@@ -1,14 +1,11 @@
-import inspect
 import unittest
 from contextlib import ExitStack
 from functools import reduce
+from typing import List, Type
 from unittest.mock import patch, MagicMock, Mock
 
 from torch import nn
 
-import src.evaluation.scenario
-from src.evaluation import scenario as scenario_module
-from src.evaluation.evaluation import EnergyEvaluation
 from src.evaluation.scenario import EvaluationScenario
 from src.models.model_resolution import LLMType
 
@@ -123,26 +120,34 @@ class EvaluationTests(unittest.TestCase):
                 self.assertEqual(expected_length, len(scenario.deferred_baseline))
 
                 evaluation_to_validate = scenario.deferred_baseline[i]()
-                expected_classes_present = reduce(
-                    lambda test_success, class_type: isinstance(evaluation_to_validate, class_type) and test_success,
-                    expected_types, True)
-                unexpected_types = [e for e in EVALUATION_CLASSES if e not in expected_types]
-                unexpected_class_present = reduce(
-                    lambda test_failure, class_type: isinstance(evaluation_to_validate, class_type) or test_failure,
-                    unexpected_types, False)
 
-                self.assertTrue(expected_classes_present)
-                self.assertFalse(unexpected_class_present)
-                _, init_kwargs = evaluation_to_validate.init_args
-                expected = self
-                self.assertEqual(expected.model_path, init_kwargs['model_path'])
-                self.assertEqual(expected.scenario_name, init_kwargs['scenario_name'])
-                self.assertEqual(expected.supports_attn_pruning, init_kwargs['supports_attn_pruning'])
-                self.assertEqual(expected.device, init_kwargs['device'])
-                self.assertEqual(expected.llm_type, init_kwargs['llm_type'])
-                self.assertEqual(expected_repetitions, init_kwargs['repetitions'])
-                expected_label = f'scenario-{expected.scenario_name}-baseline-{i}'
-                self.assertEqual(expected_label, init_kwargs['label'])
+                self.validate_types(evaluation_to_validate, expected_types)
+
+                expected_label = f'scenario-{self.scenario_name}-baseline-{i}'
+                self.validate_common_attributes(evaluation_to_validate, expected_repetitions, expected_label)
+
+    def validate_common_attributes(self, to_validate: StubEvaluation, expected_repetitions: int, expected_label: str):
+        _, init_kwargs = to_validate.init_args
+        expected = self
+        self.assertEqual(expected.model_path, init_kwargs['model_path'])
+        self.assertEqual(expected.scenario_name, init_kwargs['scenario_name'])
+        self.assertEqual(expected.supports_attn_pruning, init_kwargs['supports_attn_pruning'])
+        self.assertEqual(expected.device, init_kwargs['device'])
+        self.assertEqual(expected.llm_type, init_kwargs['llm_type'])
+        self.assertEqual(expected_repetitions, init_kwargs['repetitions'])
+        self.assertEqual(expected_label, init_kwargs['label'])
+
+    def validate_types(self, to_validate: StubEvaluation, expected_types: List[Type[StubEvaluation]]):
+        expected_classes_present = reduce(
+            lambda test_success, class_type: isinstance(to_validate, class_type) and test_success,
+            expected_types, True)
+        unexpected_types = [e for e in EVALUATION_CLASSES if e not in expected_types]
+        unexpected_class_present = reduce(
+            lambda test_failure, class_type: isinstance(to_validate, class_type) or test_failure,
+            unexpected_types, False)
+
+        self.assertTrue(expected_classes_present)
+        self.assertFalse(unexpected_class_present)
 
 
 if __name__ == '__main__':
