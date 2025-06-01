@@ -8,7 +8,7 @@ from torch import nn
 from src.evaluation.pruning import EveryOtherHead
 
 
-class MyTestCase(unittest.TestCase):
+class PruningTest(unittest.TestCase):
     
     def test_every_other(self):
         test_cases = [

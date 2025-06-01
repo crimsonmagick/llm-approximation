@@ -7,7 +7,7 @@ from tests.util.test_util_mixin import TestUtilMixin
 from tests.util.torch_utils.test_data import load_tensor
 
 
-class TestUtil(TestUtilMixin, unittest.TestCase):
+class ObjectivesTest(TestUtilMixin, unittest.TestCase):
     
     def test_cross_entropy_no_mask(self):
         sequence_count = 5

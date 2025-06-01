@@ -3,7 +3,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import NamedTuple, List, Iterable, Tuple
 
-metrics_directory = 'results/metrics'
+metrics_directory = 'results/scenarios'
 
 _energy_loggers = dict()
 _perplexity_loggers = dict()
@@ -36,8 +36,8 @@ class MetricLogger(ABC):
     def _get_filename() -> str:
         pass
 
-    def __init__(self, suite: str):
-        output_dir = os.path.join(metrics_directory, suite)
+    def __init__(self, scenario: str):
+        output_dir = os.path.join(metrics_directory, scenario)
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, self._get_filename())
 
@@ -86,13 +86,13 @@ class PerplexityLogger(MetricLogger):
         )
 
 
-def accept_energy(captured: EnergyCapture, *, suite):
-    if _energy_loggers.get(suite) is None:
-        _energy_loggers[suite] = EnergyLogger(suite)
-    _energy_loggers[suite].log(captured)
+def accept_energy(captured: EnergyCapture, *, scenario):
+    if _energy_loggers.get(scenario) is None:
+        _energy_loggers[scenario] = EnergyLogger(scenario)
+    _energy_loggers[scenario].log(captured)
 
 
-def accept_perplexity(captured: PerplexityCapture, *, suite):
-    if _perplexity_loggers.get(suite) is None:
-        _perplexity_loggers[suite] = PerplexityLogger(suite)
-    _perplexity_loggers[suite].log(captured)
+def accept_perplexity(captured: PerplexityCapture, *, scenario):
+    if _perplexity_loggers.get(scenario) is None:
+        _perplexity_loggers[scenario] = PerplexityLogger(scenario)
+    _perplexity_loggers[scenario].log(captured)
