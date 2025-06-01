@@ -48,6 +48,7 @@ class MetricLogger(ABC):
 
     def log(self, captured: Tuple):
         self.writer.writerow(captured)
+        self.file.flush()
 
     def close(self):
         self.file.close()

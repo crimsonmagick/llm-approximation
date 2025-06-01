@@ -75,7 +75,8 @@ class EvaluationScenario:
         kwargs['repetitions'] = repetitions
         label_suffix = 'warmup' if warmup else 'baseline'
         label_count = len(self.deferred_warmup) if warmup else len(self.deferred_baseline)
-        label = f'scenario-{self.scenario_name}-{label_suffix}-{label_count}'
+        label_idx = label_count - 1
+        label = f'scenario-{self.scenario_name}-{label_suffix}-{label_idx}'
         kwargs['label'] = label
         deferred = lambda: evaluation_type(**kwargs)
         if warmup:
