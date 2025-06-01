@@ -73,6 +73,7 @@ class EnergyEvaluation(Evaluation):
         for tokens in tokens_by_batch:
             attention_mask = tokens['attention_mask']
             token_count += attention_mask.sum().item()  # only count unmasked tokens
+        token_count *= self.repetitions
         energy_recorder = EnergyRecorder()
         energy_recorder.start()
         predictions = super().evaluate(tokens_by_batch)
