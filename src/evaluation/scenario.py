@@ -55,10 +55,10 @@ class EvaluationScenario:
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
 
-    def add_baseline_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False)
 
-    def add_warmup_evaluations(self, capture_energy=False, capture_perplexity=False, repetitions=1):
+    def add_warmup_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True)
 
     def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool):
@@ -85,7 +85,7 @@ class EvaluationScenario:
             self.deferred_baseline.append(deferred)
         return self
 
-    def add_pruned_evaluations(self, *, pruning_strategy, capture_energy, capture_perplexity, layer_range,
+    def add_pruned_evaluations(self, *, pruning_strategy, capture_energy=False, capture_perplexity=False, layer_range=None,
                                evaluation_name, repetitions: int = 1):
         if evaluation_name in self.pruned_evaluation_names:
             raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')
@@ -136,6 +136,8 @@ class EvaluationScenario:
 
     def execute(self):
         tokens_by_batch = []
+        # FIXME this is janky AF
+        # This assumes that the dataset, after being filtered, will have more test rows available than specified evaluation_rows
         evaluation_data = load_dataset(*self.dataset)["test"].filter(
             lambda ex: ex["text"] and len(ex["text"].strip()) > 500
         )
@@ -165,5 +167,6 @@ class EvaluationScenario:
         return self
 
     def _tokenize(self, prompt):
+        # Warning - hard dependency on pytorch tensors here
         return self.tokenizer(prompt, return_tensors='pt', padding=PaddingStrategy.LONGEST, padding_side='left',
                               truncation=TruncationStrategy.LONGEST_FIRST, max_length=512).to(self.device)

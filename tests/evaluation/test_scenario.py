@@ -5,7 +5,10 @@ from types import SimpleNamespace
 from typing import List, Type
 from unittest.mock import patch, MagicMock, Mock
 
-from torch import nn
+import torch
+from datasets import DatasetDict, Dataset
+from huggingface_hub import repo_info
+from torch import nn, Tensor
 
 from src.evaluation.pruning import PruningStrategy
 from src.evaluation.scenario import EvaluationScenario
@@ -15,13 +18,15 @@ EOS_TOKEN = 5
 
 
 class StubEvaluation:
+    created = []
 
     def __init__(self, *args, **kwargs):
         self.init_args = (args, kwargs)
         self.call_args_list = []
+        type(self).created.append(self)
 
     def evaluate(self, tokens_by_batch):
-        self.call_args_list.append([[tokens_by_batch], {}])
+        self.call_args_list.append(tokens_by_batch)
 
 
 class StubPrunedEvaluation(StubEvaluation):
@@ -65,7 +70,7 @@ class EvaluationTests(unittest.TestCase):
         self.num_attention_heads = 40
         self.num_hidden_layers = 32
         self.mock_config = SimpleNamespace(num_attention_heads=self.num_attention_heads,
-                                      num_hidden_layers=self.num_hidden_layers)
+                                           num_hidden_layers=self.num_hidden_layers)
         self.patch_config = self._patch_stack.enter_context(
             patch('src.evaluation.scenario.AutoConfig.from_pretrained')
         )
@@ -124,8 +129,8 @@ class EvaluationTests(unittest.TestCase):
         for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
             with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                               expected_repetitions=expected_repetitions, expected_types=expected_types):
-                scenario.add_baseline_evaluations(capture_energy, capture_perplexity=capture_perplexity,
-                                                  repetitions=expected_repetitions)
+                scenario.add_baseline_evaluation(capture_energy, capture_perplexity=capture_perplexity,
+                                                 repetitions=expected_repetitions)
                 expected_length = i + 1
                 self.assertEqual(expected_length, len(scenario.deferred_baseline))
 
@@ -147,8 +152,8 @@ class EvaluationTests(unittest.TestCase):
         for i, (capture_energy, capture_perplexity, expected_repetitions, expected_types) in enumerate(test_cases):
             with self.subTest(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                               expected_repetitions=expected_repetitions, expected_types=expected_types):
-                scenario.add_warmup_evaluations(capture_energy, capture_perplexity=capture_perplexity,
-                                                repetitions=expected_repetitions)
+                scenario.add_warmup_evaluation(capture_energy, capture_perplexity=capture_perplexity,
+                                               repetitions=expected_repetitions)
                 expected_length = i + 1
                 self.assertEqual(expected_length, len(scenario.deferred_warmup))
 
@@ -163,7 +168,8 @@ class EvaluationTests(unittest.TestCase):
         test_cases = [
             (False, False, Mock(PruningStrategy), 6, None, [StubEvaluation, StubPrunedEvaluation]),
             (False, False, None, 9, (0, 3), [StubEvaluation]),
-            (True, False, Mock(PruningStrategy), 10, (4, 9), [StubEnergyEvaluation, StubEvaluation, StubPrunedEvaluation]),
+            (True, False, Mock(PruningStrategy), 10, (4, 9),
+             [StubEnergyEvaluation, StubEvaluation, StubPrunedEvaluation]),
             (False, True, None, 3, None, [StubPerplexityEvaluation, StubEvaluation]),
             (True, True, Mock(PruningStrategy), 99, (22, 29),
              [StubPerplexityEvaluation, StubEnergyEvaluation, StubPrunedEvaluation, StubEvaluation])
@@ -194,6 +200,51 @@ class EvaluationTests(unittest.TestCase):
                     self.assertEqual(pruning_strategy, init_kwargs['pruning_strategy'])
                     self.assertEqual(layer_idx, init_kwargs['layer_idx'])
 
+    def test_execute(self):
+        warmup_repetitions = 25
+        energy_repetitions = 50
+        perplexity_evaluation_name = "test_pruned_evaluation"
+        energy_evaluation_name = "test_energy_evaluation"
+
+        mock_pruning_strategy = Mock(PruningStrategy)
+
+        patched_load_dataset = self._patch_stack.enter_context(
+            patch('src.evaluation.scenario.load_dataset'))
+        self.batch_size = 2
+        self.evaluation_row_count = 3
+
+        def build_entry(text):
+            return {"text": text}
+
+        dataset_entries = ["a" * 534, "b" * 512, "", "c" * 500, "d" * 675]  # a, b, and d should remain after filtering
+        test_split = [build_entry(text_entry) for text_entry in dataset_entries]
+        dataset = DatasetDict({
+            "test": Dataset.from_list(test_split)
+        })
+        patched_load_dataset.return_value = dataset
+
+        expected_batch_1 = Mock(Tensor)
+        expected_batch_1.to.return_value = expected_batch_1
+        expected_batch_2 = Mock(Tensor)
+        expected_batch_2.to.return_value = expected_batch_2
+        self.mock_tokenizer.side_effect = [expected_batch_1, expected_batch_2]
+
+        self._create_scenario() \
+            .add_warmup_evaluation(repetitions=warmup_repetitions) \
+            .add_baseline_evaluation(capture_perplexity=True) \
+            .add_baseline_evaluation(capture_energy=True, repetitions=energy_repetitions) \
+            .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=mock_pruning_strategy,
+                                    evaluation_name=perplexity_evaluation_name) \
+            .add_pruned_evaluations(capture_energy=True, pruning_strategy=mock_pruning_strategy,
+                                    evaluation_name=energy_evaluation_name) \
+            .execute()
+
+        self.assertEqual(67, len(StubEvaluation.created))
+        self.assertEqual(dataset_entries[0:2], self.mock_tokenizer.call_args_list[0][0][0])
+        self.assertEqual(dataset_entries[-1:], self.mock_tokenizer.call_args_list[1][0][0])
+
+        for evaluation in StubEvaluation.created:
+            self.assertEqual([expected_batch_1, expected_batch_2], evaluation.call_args_list[0])
 
     def validate_common_attributes(self, to_validate: StubEvaluation, expected_repetitions: int, expected_label: str):
         _, init_kwargs = to_validate.init_args
