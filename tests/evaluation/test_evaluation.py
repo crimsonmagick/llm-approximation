@@ -85,8 +85,10 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
             llm_type = LLMType.LLAMA_3
 
             layer_idx = 7
-            pruning_strategy = Mock(PruningStrategy)
-            pruning_strategy.return_value = mock_pruned_model
+            pruning_strategy = Mock()
+            pruning_strategy_instance = Mock()
+            pruning_strategy.return_value = pruning_strategy_instance
+            pruning_strategy_instance.return_value = mock_pruned_model
             under_test: Evaluation = PrunedEvaluation(model_path=model_path, scenario_name=scenario_name,
                                                       supports_attn_pruning=supports_attn_pruning,
                                                       device=device, repetitions=repetitions, llm_type=llm_type,
@@ -94,7 +96,8 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
                                                       layer_idx=layer_idx, pruning_strategy=pruning_strategy)
 
             mock_resolve_model.assert_called_once()
-            self.assertEqual(mock_model, pruning_strategy.call_args[0][0])
+            pruning_strategy.assert_called_once()
+            self.assertEqual(mock_model, pruning_strategy_instance.call_args[0][0])
             self.assertEqual(mock_pruned_model, under_test.model)
 
     def test_energy_evaluation(self):
@@ -136,7 +139,7 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
             expected_time_ms = 240
             expected_energy_mj = 300
             expected_temperature_c = 52
-            energy_recorder_instance.end.return_value.get_energy_metrics.return_value \
+            energy_recorder_instance.end.return_value.get_metrics.return_value \
                 = (expected_energy_mj, expected_time_ms, expected_temperature_c)
 
             stubbed_prediction = SimpleNamespace(logits=expected_logits)
@@ -163,7 +166,7 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
                 self.assertTrue(torch.equal(expected_input_ids, actual_input_ids))
                 self.assertTrue(torch.equal(expected_attention_mask, actual_attention_mask))
                 args, kwargs = mock_accept_energy.call_args
-                suite: str = kwargs['suite']
+                suite: str = kwargs['scenario']
                 metrics: EnergyCapture = args[0]
 
                 token_count = expected_attention_mask.sum()

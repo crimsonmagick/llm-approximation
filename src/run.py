@@ -2,6 +2,7 @@ import argparse
 
 import torch
 
+from src.evaluation.pruning import EveryOtherHead
 from src.evaluation.scenario import EvaluationScenario
 from src.models.model_resolution import LLMType
 
@@ -9,10 +10,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Performs a battery of performance tests against Transformer models.")
     parser.add_argument(
-        '--output-path',
+        'scenario_name',
         type=str,
-        default='./transformer_metrics.csv',
-        help='Optional output path. Defaults to the "transformer_metrics.csv".')
+        help='Name of the evaluation scenario to be run.')
     parser.add_argument(
         '--batch-size',
         type=int,
@@ -32,65 +32,46 @@ if __name__ == '__main__':
         help='Number of rows of the dataset to evaluate. Defaults to 1.'
     )
     parser.add_argument(
-        '--reverse-eval',
-        type=bool,
-        default=False,
-        help='Optional toggle for testing layers in reverse order. Defaults to False.'
-    )
-    parser.add_argument(
         '--layer-range',
         type=str,
         help='Range of layers to evaluate'
     )
     parser.add_argument(
-        '--baseline',
-        type=bool,
-        default=False,
-        help='Optional toggle to just test baseline. Defaults to False.'
-    )
-    parser.add_argument(
-        '--runs-per-layer',
+        '--repetitions',
         type=int,
         default=1,
-        help='Number of repeated runs per pruned layer (and baseline). Defaults to 1.'
+        help='Number of repeated runs per evaluation. Defaults to 1.'
     )
     parser.add_argument(
-        '--warmup-runs',
+        '--warmup-repetitions',
         type=int,
         default=0,
-        help='Number of warmup runs. Defaults to 0.'
+        help='Number of warmup evaluation repetitions. Defaults to 0.'
     )
-    
+
     if not torch.cuda.is_available():
         raise Exception("Cuda is currently the only supported platform.")
-    
+
     args = parser.parse_args()
     if args.layer_range is not None:
         arg_range = args.layer_range.split('-')
         layer_range = (int(arg_range[0]), int(arg_range[1]))
     else:
         layer_range = None
-    
-    if args.baseline:
-        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                           evaluation_row_count=args.eval_rows, scenario_name='baselineonly',
-                           supports_attn_pruning=True) \
-            .runner(results_path=args.output_path + '-baseline.csv') \
-            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer, baseline_only=True)
-    else:
-        if args.warmup_runs > 0:
-            EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                               evaluation_row_count=args.eval_rows, scenario_name='baselinewarmup',
-                               supports_attn_pruning=True) \
-                .runner(results_path=args.output_path + '-warmup.csv') \
-                .evaluate(batch_size=args.batch_size, num_runs=args.warmup_runs, baseline_only=True)
-        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                           evaluation_row_count=args.eval_rows, scenario_name='forward',
-                           supports_attn_pruning=True, layer_range=layer_range) \
-            .runner(results_path=args.output_path + '-forward.csv') \
-            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
-        EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                           evaluation_row_count=args.eval_rows, scenario_name='reverse',
-                           supports_attn_pruning=True, layer_range=layer_range) \
-            .runner(results_path=args.output_path + '-reverse.csv') \
-            .evaluate(batch_size=args.batch_size, num_runs=args.runs_per_layer)
+
+    scenario = EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                                  evaluation_row_count=args.eval_rows, scenario_name=args.scenario_name,
+                                  supports_attn_pruning=True, batch_size=args.batch_size)
+
+    if args.warmup_repetitions:
+        scenario.add_warmup_evaluation(repetitions=args.warmup_repetitions)
+
+    scenario \
+        .add_baseline_evaluation(capture_perplexity=True) \
+        .add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions) \
+        .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
+                                evaluation_name="every_other_head_perplexity", layer_range=layer_range) \
+        .add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
+                                evaluation_name="every_other_head_energy", layer_range=layer_range,
+                                repetitions=args.repetitions) \
+        .execute()

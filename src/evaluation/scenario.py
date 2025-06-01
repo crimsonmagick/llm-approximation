@@ -22,11 +22,10 @@ class DuplicateEvaluationError(Exception):
 
 class EvaluationScenario:
     def __init__(self, model_path: str = 'meta-llama/Meta-Llama-3-8B', *,
-                 supports_attn_pruning: bool = True, batch_size: 5,
+                 supports_attn_pruning: bool = True, batch_size=5,
                  llm_type: LLMType = LLMType.LLAMA_3, evaluation_row_count: int = 20,
                  rng_seed: int = 633, scenario_name: str, dataset: tuple = ("Salesforce/wikitext", 'wikitext-2-v1'),
                  device='cuda'):
-        self.layer_range = None
         self.model_path = model_path
         self.llm_type = llm_type
         self.evaluation_row_count = evaluation_row_count
@@ -85,7 +84,8 @@ class EvaluationScenario:
             self.deferred_baseline.append(deferred)
         return self
 
-    def add_pruned_evaluations(self, *, pruning_strategy, capture_energy=False, capture_perplexity=False, layer_range=None,
+    def add_pruned_evaluations(self, *, pruning_strategy, capture_energy=False, capture_perplexity=False,
+                               layer_range=None,
                                evaluation_name, repetitions: int = 1):
         if evaluation_name in self.pruned_evaluation_names:
             raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')

@@ -63,7 +63,7 @@ class PrunedEvaluation(Evaluation):
 
     def _get_model(self):
         model = super()._get_model()
-        return self.pruning_strategy(model)
+        return self.pruning_strategy()(model, self.layer_idx)
 
 
 class EnergyEvaluation(Evaluation):
@@ -76,7 +76,7 @@ class EnergyEvaluation(Evaluation):
         energy_recorder = EnergyRecorder()
         energy_recorder.start()
         predictions = super().evaluate(tokens_by_batch)
-        energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_energy_metrics()
+        energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
         if token_count > 0:
             average_time_per_token_ms = execution_time_ms / token_count
             average_energy_per_token_mj = energy_usage_mj / token_count
@@ -97,28 +97,34 @@ class EnergyEvaluation(Evaluation):
             layer_idx=self.layer_idx if hasattr(self, 'layer_idx') else None,
             head_idxs=self.head_idxs if hasattr(self, 'head_idxs') else None
         )
-        metrics_manager.accept_energy(captured_metrics, suite=self.scenario_name)
+        metrics_manager.accept_energy(captured_metrics, scenario=self.scenario_name)
 
         return predictions
 
 
 class PerplexityEvaluation(Evaluation):
 
-    def evaluate(self, **kwargs):
-        input_ids = kwargs['input_ids']
-        attention_mask = kwargs['attention_mask']
-        loss_token_count = attention_mask[:, 1:].sum().item()
+    def evaluate(self, tokens_by_batch):
+        loss_token_count = 0
+        input_ids = []
+        attention_masks = []
+        for tokens in tokens_by_batch:
+            input_ids.append(tokens['input_ids'])
+            attention_masks.append(tokens['attention_mask'])
+            loss_token_count += tokens['attention_mask'][:, 1:].sum().item()
 
-        prediction = super().evaluate(**kwargs)
+        prediction = super().evaluate(tokens_by_batch)
+        prediction_logits = [batch.logits for batch in prediction]
 
-        token_losses = objective.cross_entropy(input_ids, attention_mask, prediction.logits)
+        token_losses = objective.cross_entropy(torch.cat(input_ids), torch.cat(attention_masks),
+                                               torch.cat(prediction_logits))
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
         captured_metrics = PerplexityCapture(
             label=self.label,
             perplexity=perplexity,
-            layer_idx=self.layer_idx,
-            head_idxs=self.head_idxs
+            layer_idx=self.layer_idx if hasattr(self, 'layer_idx') else None,
+            head_idxs=self.head_idxs if hasattr(self, 'head_idxs') else None
         )
-        metrics_manager.accept_perplexity(captured_metrics, suite=self.scenario_name)
+        metrics_manager.accept_perplexity(captured_metrics, scenario=self.scenario_name)
 
         return prediction
