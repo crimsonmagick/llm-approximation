@@ -18,15 +18,23 @@ EOS_TOKEN = 5
 
 
 class StubEvaluation:
-    created = []
+    _created = []
 
     def __init__(self, *args, **kwargs):
         self.init_args = (args, kwargs)
         self.call_args_list = []
-        type(self).created.append(self)
+        type(self)._created.append(self)
 
     def evaluate(self, tokens_by_batch):
         self.call_args_list.append(tokens_by_batch)
+
+    @staticmethod
+    def get_creation_history():
+        return StubEvaluation._created
+
+    @staticmethod
+    def clear_creation_history():
+        StubEvaluation._created = []
 
 
 class StubPrunedEvaluation(StubEvaluation):
@@ -46,6 +54,7 @@ EVALUATION_CLASSES = [StubEvaluation, StubPrunedEvaluation, StubPerplexityEvalua
 
 class EvaluationTests(unittest.TestCase):
     def setUp(self):
+        StubEvaluation.clear_creation_history()
         self._patch_stack = ExitStack()
         self.addCleanup(self._patch_stack.close)
 
@@ -239,11 +248,11 @@ class EvaluationTests(unittest.TestCase):
                                     evaluation_name=energy_evaluation_name) \
             .execute()
 
-        self.assertEqual(67, len(StubEvaluation.created))
+        self.assertEqual(67, len(StubEvaluation.get_creation_history()))
         self.assertEqual(dataset_entries[0:2], self.mock_tokenizer.call_args_list[0][0][0])
         self.assertEqual(dataset_entries[-1:], self.mock_tokenizer.call_args_list[1][0][0])
 
-        for evaluation in StubEvaluation.created:
+        for evaluation in StubEvaluation.get_creation_history():
             self.assertEqual([expected_batch_1, expected_batch_2], evaluation.call_args_list[0])
 
     def validate_common_attributes(self, to_validate: StubEvaluation, expected_repetitions: int, expected_label: str):

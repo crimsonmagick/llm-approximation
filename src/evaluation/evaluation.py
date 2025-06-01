@@ -6,7 +6,7 @@ import torch
 from src.metrics import metrics_manager
 from src.metrics.energy.energy_recording import EnergyRecorder
 from src.metrics.function import objective
-from src.metrics.metrics_manager import EnergyCapture, PerplexityMetricsCapture
+from src.metrics.metrics_manager import EnergyCapture, PerplexityCapture
 from src.models.model_resolution import resolve_model, LLMType
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class PerplexityEvaluation(Evaluation):
 
         token_losses = objective.cross_entropy(input_ids, attention_mask, prediction.logits)
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
-        captured_metrics = PerplexityMetricsCapture(
+        captured_metrics = PerplexityCapture(
             label=self.label,
             perplexity=perplexity,
             layer_idx=self.layer_idx,
