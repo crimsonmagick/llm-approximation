@@ -169,7 +169,7 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
                 suite: str = kwargs['scenario']
                 metrics: EnergyCapture = args[0]
 
-                token_count = expected_attention_mask.sum()
+                token_count = expected_attention_mask.sum().item() * repetitions
 
                 self.assertEqual(scenario_name, suite)
                 self.assertEqual(label, metrics.label)

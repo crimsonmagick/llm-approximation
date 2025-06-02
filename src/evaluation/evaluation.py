@@ -63,7 +63,7 @@ class PrunedEvaluation(Evaluation):
 
     def _get_model(self):
         model = super()._get_model()
-        return self.pruning_strategy()(model, self.layer_idx)
+        return self.pruning_strategy(self)(model)
 
 
 class EnergyEvaluation(Evaluation):

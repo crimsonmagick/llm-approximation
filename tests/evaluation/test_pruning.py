@@ -20,12 +20,14 @@ class PruningTest(unittest.TestCase):
         ]
         for layer_idx, num_heads, expected_heads in test_cases:
             with self.subTest(layer_idx=layer_idx, num_heads=num_heads, expected_heads=expected_heads):
+                mock_evaluation = Mock()
+                mock_evaluation.layer_idx = layer_idx
                 model = Mock(spec=nn.Module)
                 mock_config = SimpleNamespace()
                 mock_config.num_attention_heads = num_heads
                 model.config = mock_config
                 model.prune_heads = Mock()
-                EveryOtherHead()(model, layer_idx)
+                EveryOtherHead(mock_evaluation)(model)
                 args, _ = model.prune_heads.call_args
                 head_dict: Dict[List] = args[0]
                 self.assertEqual({layer_idx: expected_heads}, head_dict)
