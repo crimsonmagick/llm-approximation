@@ -27,21 +27,16 @@ class Evaluation:
         self.model = self._get_model()
 
     def evaluate(self, tokens_by_batch):
-        num_batches = len(tokens_by_batch)
-        predictions = []
-        for run_idx in range(self.repetitions):
-            self._clear_memory()
-            for batch_index, tokens in enumerate(tokens_by_batch):
-                input_ids = tokens['input_ids']
-                attention_mask = tokens['attention_mask']
-                logger.info(
-                    f"{self.scenario_name}-{self.label}: Evaluating run={run_idx}/{self.repetitions}, batch={batch_index + 1}/{num_batches}")
-
-                with torch.no_grad():
-                    prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
-                    if run_idx == self.repetitions - 1:
-                        predictions.append(prediction)
-        return predictions
+        # num_batches = len(tokens_by_batch)
+        logger.info(
+            f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
+        input_ids = tokens_by_batch[0]['input_ids']
+        attention_mask = tokens_by_batch[0]['attention_mask']
+        with torch.no_grad():
+            for run_idx in range(self.repetitions):
+                prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        self._clear_memory()
+        return [prediction]
 
     def _get_model(self):
         return resolve_model(self.llm_type, self.model_path,
