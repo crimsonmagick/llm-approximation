@@ -48,6 +48,17 @@ if __name__ == '__main__':
         default=0,
         help='Number of warmup evaluation repetitions. Defaults to 0.'
     )
+    parser.add_argument(
+        '--evaluation-runs',
+        type=int,
+        default=1,
+        help='Number of evaluation runs. This differs from repetitions in that a new measurement is made after each '
+             'run, each run consisting of a number of repetitions. Defaults to 1.'
+    )
+    parser.add_argument(
+        '--capture-perplexity',
+        action='store_true'
+    )
 
     if not torch.cuda.is_available():
         raise Exception("Cuda is currently the only supported platform.")
@@ -64,16 +75,17 @@ if __name__ == '__main__':
                                   supports_attn_pruning=True, batch_size=args.batch_size)
 
     if args.warmup_repetitions:
-        scenario.add_warmup_evaluation(repetitions=args.warmup_repetitions)
-    for i in range(50):
-        scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions)
+        scenario.add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True)
 
-    # scenario \
-    #     .add_baseline_evaluation(capture_perplexity=True) \
-    #     .add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions) \
-    #     .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
-    #                                      evaluation_name="every_other_head_perplexity", layer_range=layer_range)
-    for i in range(50):
+    if args.capture_perplexity:
+        scenario \
+            .add_baseline_evaluation(capture_perplexity=True) \
+            .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
+                                    evaluation_name="every_other_head_perplexity", layer_range=layer_range)
+
+    for i in range(args.evaluation_runs):
+        scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions)
+    for i in range(args.evaluation_runs):
         scenario.add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
                                         evaluation_name=f"every_other_head_energy_{i}", layer_range=layer_range,
                                         repetitions=args.repetitions)
