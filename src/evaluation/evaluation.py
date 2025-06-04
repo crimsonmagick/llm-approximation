@@ -70,9 +70,17 @@ class EnergyEvaluation(Evaluation):
             token_count += attention_mask.sum().item()  # only count unmasked tokens
         token_count *= self.repetitions
         energy_recorder = EnergyRecorder()
-        energy_recorder.start()
-        predictions = super().evaluate(tokens_by_batch)
-        energy_usage_mj, execution_time_ms, temperature = energy_recorder.end().get_metrics()
+        input_ids = tokens_by_batch[0]['input_ids']
+        attention_mask = tokens_by_batch[0]['attention_mask']
+        self._clear_memory()
+        logger.info(
+            f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
+        with torch.no_grad():
+            energy_recorder.start()
+            for run_idx in range(self.repetitions):
+                prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            energy_usage_mj, execution_time_ms = energy_recorder.end().get_metrics()
+
         if token_count > 0:
             average_time_per_token_ms = execution_time_ms / token_count
             average_energy_per_token_mj = energy_usage_mj / token_count
@@ -95,7 +103,7 @@ class EnergyEvaluation(Evaluation):
         )
         metrics_manager.accept_energy(captured_metrics, scenario=self.scenario_name)
 
-        return predictions
+        return [prediction]
 
 
 class PerplexityEvaluation(Evaluation):

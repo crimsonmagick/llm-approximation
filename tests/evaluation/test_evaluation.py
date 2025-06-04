@@ -140,7 +140,7 @@ class EvaluationTests(TestUtilMixin, unittest.TestCase):
             expected_energy_mj = 300
             expected_temperature_c = 52
             energy_recorder_instance.end.return_value.get_metrics.return_value \
-                = (expected_energy_mj, expected_time_ms, expected_temperature_c)
+                = (expected_energy_mj, expected_time_ms)
 
             stubbed_prediction = SimpleNamespace(logits=expected_logits)
             mock_model.return_value = stubbed_prediction
