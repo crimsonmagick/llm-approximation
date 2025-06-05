@@ -76,6 +76,9 @@ class EnergyEvaluation(Evaluation):
         logger.info(
             f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
         with torch.no_grad():
+            # warmup
+            for run_idx in range(10):
+                prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
             energy_recorder.start()
             for run_idx in range(self.repetitions):
                 prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
