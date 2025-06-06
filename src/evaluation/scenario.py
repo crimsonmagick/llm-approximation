@@ -54,13 +54,13 @@ class EvaluationScenario:
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
 
-    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
-        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False)
+    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1, warmup_repetitions=0):
+        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False, warmup_repetitions)
 
     def add_warmup_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
-        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True)
+        return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True, warmup_repetitions=0)
 
-    def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool):
+    def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool, warmup_repetitions):
         chain_of_command: List[Type[Evaluation]] = []
         if capture_perplexity:
             chain_of_command.append(PerplexityEvaluation)
@@ -73,6 +73,7 @@ class EvaluationScenario:
 
         kwargs = self.__get_default_kwargs()
         kwargs['repetitions'] = repetitions
+        kwargs['warmup-repetitions'] = warmup_repetitions
         label_suffix = 'warmup' if warmup else 'baseline'
         label_count = len(self.deferred_warmup) if warmup else len(self.deferred_baseline)
         label_idx = label_count
@@ -87,7 +88,7 @@ class EvaluationScenario:
 
     def add_pruned_evaluations(self, *, pruning_strategy, capture_energy=False, capture_perplexity=False,
                                layer_range=None,
-                               evaluation_name, repetitions: int = 1):
+                               evaluation_name, repetitions: int = 1, warmup_repetitions = 0):
         if evaluation_name in self.pruned_evaluation_names:
             raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')
         if layer_range is not None:
@@ -115,6 +116,7 @@ class EvaluationScenario:
 
         default_kwargs = self.__get_default_kwargs()
         default_kwargs['repetitions'] = repetitions
+        default_kwargs['warmup_repetitions'] = warmup_repetitions
         default_kwargs['pruning_strategy'] = pruning_strategy
 
         for layer_idx in range(first_layer, final_layer):

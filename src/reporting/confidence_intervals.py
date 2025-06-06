@@ -1,24 +1,23 @@
 import argparse
 import csv
-from statistics import mean, stdev, median
 
 import numpy as np
 import scipy.stats as stats
 
 
-def print_metrics(metrics_name, energies, confidence_level):
+def print_metrics(metric_name, energies, confidence_level):
     energies.sort()
 
     energy_max = max(energies)
     energy_min = min(energies)
-    energy_mean = mean(energies)
-    energy_median = median(energies)
-    energy_std_dev = stdev(energies)
-    energy_ci = stats.t.interval(confidence_level, df=len(energies) - 1, loc=np.mean(energies),
-                                 scale=np.std(energies, ddof=1) / np.sqrt(len(energies)))
+    energy_mean = np.mean(energies)
+    energy_median = np.median(energies)
+    energy_std_dev = np.std(energies, ddof=1)
+    energy_ci = stats.t.interval(confidence_level, df=len(energies) - 1, loc=energy_mean,
+                                 scale=energy_std_dev / np.sqrt(len(energies)))
 
     print('--------------------------')
-    print(f'--------{metrics_name}-----------')
+    print(f'--------{metric_name}-----------')
     print('--------------------------')
     print(f'energies={energies}')
     print(f"energy_mean={energy_mean}\n"
@@ -35,10 +34,19 @@ if __name__ == '__main__':
     parser.add_argument(
         '--input-path',
         type=str,
-        help='Input path for csv file, required'
+        help='Input path for csv file, required',
+        required=True
+    )
+    parser.add_argument(
+        '--confidence-level',
+        type=float,
+        help='Input path for csv file, required',
+        required=True
     )
     args = parser.parse_args()
     input_path = args.input_path
+    confidence_level = args.confidence_level
+
     baseline_energies = []
     pruned_by_layer = dict()
 
@@ -57,7 +65,6 @@ if __name__ == '__main__':
                 layer_energies = pruned_by_layer.setdefault(layer, [])
                 layer_energies.append(mj_per_token)
 
-    confidence_level = 0.99
     print_metrics('Baseline', baseline_energies, confidence_level)
     for layer, energies in pruned_by_layer.items():
         print_metrics(f'Layer {layer}', energies, confidence_level)

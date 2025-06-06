@@ -16,7 +16,7 @@ class Evaluation:
 
     def __init__(self, *, model_path: str, scenario_name: str,
                  supports_attn_pruning: bool, device, repetitions,
-                 llm_type: LLMType, label):
+                 llm_type: LLMType, label, warmup_repetitions=None):
         self.scenario_name = scenario_name
         self.device = device
         self.repetitions = repetitions
@@ -25,6 +25,7 @@ class Evaluation:
         self.model_path = model_path
         self.supports_attn_pruning = supports_attn_pruning
         self.model = self._get_model()
+        self.warmup_repetitions = warmup_repetitions
 
     def evaluate(self, tokens_by_batch):
         # num_batches = len(tokens_by_batch)
@@ -73,12 +74,15 @@ class EnergyEvaluation(Evaluation):
         input_ids = tokens_by_batch[0]['input_ids']
         attention_mask = tokens_by_batch[0]['attention_mask']
         self._clear_memory()
-        logger.info(
-            f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
         with torch.no_grad():
-            # warmup
-            for run_idx in range(10):
-                prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            if self.warmup_repetitions:
+                logger.info(
+                    f"{self.scenario_name}-{self.label}: Evaluating warmup repetitions, warmup_repetitions={self.warmup_repetitions}")
+                for run_idx in range(self.warmup_repetitions):
+                    prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
+
+            logger.info(
+                f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
             energy_recorder.start()
             for run_idx in range(self.repetitions):
                 prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)

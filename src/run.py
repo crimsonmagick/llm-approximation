@@ -46,7 +46,13 @@ if __name__ == '__main__':
         '--warmup-repetitions',
         type=int,
         default=0,
-        help='Number of warmup evaluation repetitions. Defaults to 0.'
+        help='Number of general repetitions for Warmup evaluations. Defaults to 0.'
+    )
+    parser.add_argument(
+        '--evaluation-warmup-repetitions',
+        type=int,
+        default=0,
+        help='Number of warmup repetitions within all Evaluations. Defaults to 0.'
     )
     parser.add_argument(
         '--evaluation-runs',
@@ -57,6 +63,10 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--capture-perplexity',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--skip-baseline',
         action='store_true'
     )
 
@@ -74,19 +84,24 @@ if __name__ == '__main__':
                                   evaluation_row_count=args.eval_rows, scenario_name=args.scenario_name,
                                   supports_attn_pruning=True, batch_size=args.batch_size)
 
+    warmup_repetitions = args.evaluation_warmup_repetitions
+
     if args.warmup_repetitions:
         scenario.add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True)
 
     if args.capture_perplexity:
-        scenario \
-            .add_baseline_evaluation(capture_perplexity=True) \
-            .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
-                                    evaluation_name="every_other_head_perplexity", layer_range=layer_range)
+        if not args.skip_baseline:
+            scenario.add_baseline_evaluation(capture_perplexity=True)
+        scenario.add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
+                                        evaluation_name="every_other_head_perplexity", layer_range=layer_range)
 
-    for i in range(args.evaluation_runs):
-        scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions)
+    if not args.skip_baseline:
+        for i in range(args.evaluation_runs):
+            scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions,
+                                             warmup_repetitions=warmup_repetitions)
     for i in range(args.evaluation_runs):
         scenario.add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
                                         evaluation_name=f"every_other_head_energy_{i}", layer_range=layer_range,
-                                        repetitions=args.repetitions)
+                                        repetitions=args.repetitions,
+                                        warmup_repetitions=warmup_repetitions)
     scenario.execute()
