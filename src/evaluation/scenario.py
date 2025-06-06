@@ -94,12 +94,12 @@ class EvaluationScenario:
             first_layer, final_layer = layer_range
         else:
             first_layer = 0
-            final_layer = self.config.num_hidden_layers - 1  # FIXME this is a Llama3 specific attr
+            final_layer = self.config.num_hidden_layers  # FIXME this is a Llama3 specific attr
 
         if (final_layer <= first_layer
                 or final_layer - first_layer > self.config.num_hidden_layers
                 or final_layer < 0 or first_layer < 0):
-            error_message = f"Invalid layer range specified: {layer_range}, model layer_range={self.config.num_hidden_layers}"
+            error_message = f"Invalid layer range specified: {layer_range}, model layer_range=(0, {self.config.num_hidden_layers})"
             raise Exception(error_message)
         chain_of_command: List[Type[Evaluation]] = []
         if pruning_strategy is not None:
@@ -117,7 +117,7 @@ class EvaluationScenario:
         default_kwargs['repetitions'] = repetitions
         default_kwargs['pruning_strategy'] = pruning_strategy
 
-        for layer_idx in range(first_layer, final_layer + 1):
+        for layer_idx in range(first_layer, final_layer):
             label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer-{layer_idx}'
             kwargs = default_kwargs.copy()
             kwargs['label'] = label
