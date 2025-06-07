@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 
-from src.evaluation.evaluation import PrunedEvaluation
+
+class PruningException(Exception):
+    pass
 
 
 class PruningStrategy(ABC):
-
-    def __init__(self, evaluation: PrunedEvaluation):
-        self.evaluation = evaluation
 
     @abstractmethod
     def __call__(self, model):
@@ -15,9 +14,17 @@ class PruningStrategy(ABC):
 
 class EveryOtherHead(PruningStrategy):
 
+    def __init__(self, layer_idx: int):
+        super().__init__()
+        self.layer_idx = layer_idx
+
     def __call__(self, model):
-        layer_idx = self.evaluation.layer_idx
         num_heads = model.config.num_attention_heads
         head_idxs = list(range(0, num_heads, 2))
-        model.prune_heads({layer_idx: head_idxs})
-        return model
+        prune_params = {self.layer_idx: head_idxs}
+        model.prune_heads(prune_params)
+        return prune_params
+
+
+    def metadata(self):
+        return

@@ -16,7 +16,7 @@ class Evaluation:
 
     def __init__(self, *, model_path: str, scenario_name: str,
                  supports_attn_pruning: bool, device, repetitions,
-                 llm_type: LLMType, label, warmup_repetitions=None):
+                 llm_type: LLMType, label, warmup_repetitions=None, pruning_strategy=None):
         self.scenario_name = scenario_name
         self.device = device
         self.repetitions = repetitions
@@ -26,9 +26,10 @@ class Evaluation:
         self.supports_attn_pruning = supports_attn_pruning
         self.model = self._get_model()
         self.warmup_repetitions = warmup_repetitions
+        self.pruning_strategy = pruning_strategy
+        self.pruning_metadata = None
 
     def evaluate(self, tokens_by_batch):
-        # num_batches = len(tokens_by_batch)
         logger.info(
             f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
         input_ids = tokens_by_batch[0]['input_ids']
@@ -40,26 +41,17 @@ class Evaluation:
         return [prediction]
 
     def _get_model(self):
-        return resolve_model(self.llm_type, self.model_path,
-                             self.supports_attn_pruning)
+        model = resolve_model(self.llm_type, self.model_path,
+                              self.supports_attn_pruning)
+        if self.pruning_strategy:
+            self.pruning_strategy(model)
+        return model
 
     @staticmethod
     def _clear_memory():
         gc.collect()
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
-
-
-class PrunedEvaluation(Evaluation):
-
-    def __init__(self, *, layer_idx: int, pruning_strategy, **kwargs):
-        self.layer_idx = layer_idx
-        self.pruning_strategy = pruning_strategy
-        super().__init__(**kwargs)
-
-    def _get_model(self):
-        model = super()._get_model()
-        return self.pruning_strategy(self)(model)
 
 
 class EnergyEvaluation(Evaluation):

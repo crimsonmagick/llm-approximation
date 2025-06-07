@@ -103,8 +103,6 @@ class EvaluationScenario:
             error_message = f"Invalid layer range specified: {layer_range}, model layer_range=(0, {self.config.num_hidden_layers})"
             raise Exception(error_message)
         chain_of_command: List[Type[Evaluation]] = []
-        if pruning_strategy is not None:
-            chain_of_command.append(PrunedEvaluation)
         if capture_perplexity:
             chain_of_command.append(PerplexityEvaluation)
         if capture_energy:
@@ -117,13 +115,13 @@ class EvaluationScenario:
         default_kwargs = self.__get_default_kwargs()
         default_kwargs['repetitions'] = repetitions
         default_kwargs['warmup_repetitions'] = warmup_repetitions
-        default_kwargs['pruning_strategy'] = pruning_strategy
 
         for layer_idx in range(first_layer, final_layer):
             label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer-{layer_idx}'
             kwargs = default_kwargs.copy()
             kwargs['label'] = label
-            kwargs['layer_idx'] = layer_idx
+            if pruning_strategy:
+                kwargs['pruning_strategy'] = pruning_strategy(layer_idx)
             self.deferred_pruned.append(partial(evaluation_type, **kwargs))
         self.pruned_evaluation_names.add(evaluation_name)
         return self
