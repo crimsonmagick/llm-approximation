@@ -9,7 +9,7 @@ from transformers import AutoConfig, AutoTokenizer
 from transformers.tokenization_utils_base import TruncationStrategy
 from transformers.utils import PaddingStrategy
 
-from src.evaluation.evaluation import EnergyEvaluation, PerplexityEvaluation, PrunedEvaluation, Evaluation
+from src.evaluation.evaluation import EnergyEvaluation, PerplexityEvaluation, Evaluation
 from src.models.model_resolution import LLMType
 
 logging.basicConfig(level=logging.INFO, force=True)
