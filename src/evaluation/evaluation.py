@@ -29,7 +29,7 @@ class Evaluation:
         self.model = resolve_model(self.llm_type, self.model_path,
                               self.supports_attn_pruning)
         if pruning_strategy:
-            self.pruning_metadata = pruning_strategy(model)
+            self.pruning_metadata = pruning_strategy(self.model)
 
     def evaluate(self, tokens_by_batch):
         logger.info(
