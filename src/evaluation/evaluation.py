@@ -26,7 +26,7 @@ class Evaluation:
         self.supports_attn_pruning = supports_attn_pruning
         self.warmup_repetitions = warmup_repetitions
         self.pruning_metadata = None
-        model = resolve_model(self.llm_type, self.model_path,
+        self.model = resolve_model(self.llm_type, self.model_path,
                               self.supports_attn_pruning)
         if pruning_strategy:
             self.pruning_metadata = pruning_strategy(model)
