@@ -24,10 +24,12 @@ class Evaluation:
         self.llm_type = llm_type
         self.model_path = model_path
         self.supports_attn_pruning = supports_attn_pruning
-        self.model = self._get_model()
         self.warmup_repetitions = warmup_repetitions
-        self.pruning_strategy = pruning_strategy
         self.pruning_metadata = None
+        model = resolve_model(self.llm_type, self.model_path,
+                              self.supports_attn_pruning)
+        if pruning_strategy:
+            self.pruning_metadata = pruning_strategy(model)
 
     def evaluate(self, tokens_by_batch):
         logger.info(
@@ -39,13 +41,6 @@ class Evaluation:
                 prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
         self._clear_memory()
         return [prediction]
-
-    def _get_model(self):
-        model = resolve_model(self.llm_type, self.model_path,
-                              self.supports_attn_pruning)
-        if self.pruning_strategy:
-            self.pruning_strategy(model)
-        return model
 
     @staticmethod
     def _clear_memory():
