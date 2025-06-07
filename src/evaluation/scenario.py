@@ -73,7 +73,7 @@ class EvaluationScenario:
 
         kwargs = self.__get_default_kwargs()
         kwargs['repetitions'] = repetitions
-        kwargs['warmup-repetitions'] = warmup_repetitions
+        kwargs['warmup_repetitions'] = warmup_repetitions
         label_suffix = 'warmup' if warmup else 'baseline'
         label_count = len(self.deferred_warmup) if warmup else len(self.deferred_baseline)
         label_idx = label_count
