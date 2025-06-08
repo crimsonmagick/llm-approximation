@@ -27,7 +27,8 @@ class Evaluation:
         self.warmup_repetitions = warmup_repetitions
         self.pruning_metadata = None
         self.model = resolve_model(self.llm_type, self.model_path,
-                              self.supports_attn_pruning)
+                                   self.supports_attn_pruning)
+        self.pruning_strategy = pruning_strategy
         if pruning_strategy:
             self.pruning_metadata = pruning_strategy(self.model)
 
@@ -92,10 +93,10 @@ class EnergyEvaluation(Evaluation):
             label=self.label,
             average_energy_per_token_mj=average_energy_per_token_mj,
             average_time_per_token_ms=average_time_per_token_ms,
-            layer_idx=self.layer_idx if hasattr(self, 'layer_idx') else None,
-            head_idxs=self.head_idxs if hasattr(self, 'head_idxs') else None
+            prune_strategy=type(self.pruning_strategy).__name__ if self.pruning_metadata else None,
+            pruning_metadata=self.pruning_metadata
         )
-        metrics_manager.accept_energy(captured_metrics, scenario=self.scenario_name)
+        metrics_manager.log_energy(captured_metrics, scenario=self.scenario_name)
 
         return [prediction]
 
@@ -119,10 +120,10 @@ class PerplexityEvaluation(Evaluation):
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
         captured_metrics = PerplexityCapture(
             label=self.label,
-            perplexity=perplexity,
-            layer_idx=self.layer_idx if hasattr(self, 'layer_idx') else None,
-            head_idxs=self.head_idxs if hasattr(self, 'head_idxs') else None
+            prune_strategy=type(self.pruning_strategy).__name__ if self.pruning_metadata else None,
+            pruning_metadata=self.pruning_metadata,
+            perplexity=perplexity
         )
-        metrics_manager.accept_perplexity(captured_metrics, scenario=self.scenario_name)
+        metrics_manager.log_perplexity(captured_metrics, scenario=self.scenario_name)
 
         return prediction

@@ -11,16 +11,16 @@ _perplexity_loggers = dict()
 
 class EnergyCapture(NamedTuple):
     label: str
-    layer_idx: int
-    head_idxs: List[int]
+    prune_strategy: str
+    pruning_metadata: str
     average_energy_per_token_mj: float
     average_time_per_token_ms: float
 
 
 class PerplexityCapture(NamedTuple):
     label: str
-    layer_idx: int
-    head_idxs: List[int]
+    prune_strategy: str
+    pruning_metadata: str
     perplexity: float
 
 
@@ -87,13 +87,13 @@ class PerplexityLogger(MetricLogger):
         )
 
 
-def accept_energy(captured: EnergyCapture, *, scenario):
+def log_energy(captured: EnergyCapture, *, scenario):
     if _energy_loggers.get(scenario) is None:
         _energy_loggers[scenario] = EnergyLogger(scenario)
     _energy_loggers[scenario].log(captured)
 
 
-def accept_perplexity(captured: PerplexityCapture, *, scenario):
+def log_perplexity(captured: PerplexityCapture, *, scenario):
     if _perplexity_loggers.get(scenario) is None:
         _perplexity_loggers[scenario] = PerplexityLogger(scenario)
     _perplexity_loggers[scenario].log(captured)

@@ -50,7 +50,7 @@ class MetricsManagerTest(unittest.TestCase):
         scenarios = [scenario_1, scenario_2, scenario_1]
 
         for scenario, energy_capture in zip(scenarios, energy_captures):
-            metrics_manager.accept_energy(energy_capture, scenario=scenario)
+            metrics_manager.log_energy(energy_capture, scenario=scenario)
 
         expected_scenarios = [scenario_1, scenario_2]
 
@@ -107,7 +107,7 @@ class MetricsManagerTest(unittest.TestCase):
         scenarios = [scenario_1, scenario_2, scenario_1]
 
         for scenario, perplexity_capture in zip(scenarios, perplexity_captures):
-            metrics_manager.accept_perplexity(perplexity_capture, scenario=scenario)
+            metrics_manager.log_perplexity(perplexity_capture, scenario=scenario)
 
         expected_scenarios = [scenario_1, scenario_2]
 
