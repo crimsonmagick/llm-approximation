@@ -13,7 +13,7 @@ class LLMType(Enum):
     BERT = 'BERT'
 
 
-def resolve_model(llm_type: LLMType, path: string, pruned=False) -> PreTrainedModel:
+def resolve_model(llm_type: LLMType, path: string) -> PreTrainedModel:
     if llm_type == LLMType.LLAMA_3:
         return PrunedLlamaForCausalLM.from_pretrained(path, torch_dtype=bfloat16, device_map='cuda')
     else:

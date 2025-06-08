@@ -15,33 +15,30 @@ logger = logging.getLogger(__name__)
 class Evaluation:
 
     def __init__(self, *, model_path: str, scenario_name: str,
-                 supports_attn_pruning: bool, device, repetitions,
-                 llm_type: LLMType, label, warmup_repetitions=None, pruning_strategy=None):
+                 device, repetitions, llm_type: LLMType, label, warmup_repetitions=None,
+                 pruning_strategy=None):
         self.scenario_name = scenario_name
         self.device = device
         self.repetitions = repetitions
         self.label = label
         self.llm_type = llm_type
         self.model_path = model_path
-        self.supports_attn_pruning = supports_attn_pruning
         self.warmup_repetitions = warmup_repetitions
         self.pruning_metadata = None
-        self.model = resolve_model(self.llm_type, self.model_path,
-                                   self.supports_attn_pruning)
+        self.model = resolve_model(self.llm_type, self.model_path)
         self.pruning_strategy = pruning_strategy
         if pruning_strategy:
             self.pruning_metadata = pruning_strategy(self.model)
 
-    def evaluate(self, tokens_by_batch):
+    def evaluate(self, batch):
         logger.info(
             f"{self.scenario_name}-{self.label}: Evaluating repetitions={self.repetitions}")
-        input_ids = tokens_by_batch[0]['input_ids']
-        attention_mask = tokens_by_batch[0]['attention_mask']
+        input_ids = batch['input_ids']
+        attention_mask = batch['attention_mask']
         with torch.no_grad():
             for run_idx in range(self.repetitions):
                 prediction = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        self._clear_memory()
-        return [prediction]
+        return prediction
 
     @staticmethod
     def _clear_memory():
@@ -52,15 +49,12 @@ class Evaluation:
 
 class EnergyEvaluation(Evaluation):
 
-    def evaluate(self, tokens_by_batch):
-        token_count = 0
-        for tokens in tokens_by_batch:
-            attention_mask = tokens['attention_mask']
-            token_count += attention_mask.sum().item()  # only count unmasked tokens
+    def evaluate(self, batch):
+        attention_mask = batch['attention_mask']
+        token_count = attention_mask.sum().item()  # only count unmasked tokens
         token_count *= self.repetitions
         energy_recorder = EnergyRecorder()
-        input_ids = tokens_by_batch[0]['input_ids']
-        attention_mask = tokens_by_batch[0]['attention_mask']
+        input_ids = batch['input_ids']
         self._clear_memory()
         with torch.no_grad():
             if self.warmup_repetitions:
@@ -98,25 +92,20 @@ class EnergyEvaluation(Evaluation):
         )
         metrics_manager.log_energy(captured_metrics, scenario=self.scenario_name)
 
-        return [prediction]
+        return prediction
 
 
 class PerplexityEvaluation(Evaluation):
 
-    def evaluate(self, tokens_by_batch):
-        loss_token_count = 0
-        input_ids = []
-        attention_masks = []
-        for tokens in tokens_by_batch:
-            input_ids.append(tokens['input_ids'])
-            attention_masks.append(tokens['attention_mask'])
-            loss_token_count += tokens['attention_mask'][:, 1:].sum().item()
+    def evaluate(self, batch):
+        input_ids = batch['input_ids']
+        attention_mask = batch['attention_mask']
+        loss_token_count = attention_mask[:, 1:].sum().item()
 
-        prediction = super().evaluate(tokens_by_batch)
-        prediction_logits = [batch.logits for batch in prediction]
+        prediction = super().evaluate(batch)
 
-        token_losses = objective.cross_entropy(torch.cat(input_ids), torch.cat(attention_masks),
-                                               torch.cat(prediction_logits))
+        token_losses = objective.cross_entropy(input_ids, attention_mask,
+                                               prediction.logits)
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
         captured_metrics = PerplexityCapture(
             label=self.label,

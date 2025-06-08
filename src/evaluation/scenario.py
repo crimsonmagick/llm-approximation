@@ -22,16 +22,14 @@ class DuplicateEvaluationError(Exception):
 
 class EvaluationScenario:
     def __init__(self, model_path: str = 'meta-llama/Meta-Llama-3-8B', *,
-                 supports_attn_pruning: bool = True, batch_size=5,
-                 llm_type: LLMType = LLMType.LLAMA_3, evaluation_row_count: int = 20,
-                 rng_seed: int = 633, scenario_name: str, dataset: tuple = ("Salesforce/wikitext", 'wikitext-2-v1'),
+                 batch_size, llm_type: LLMType = LLMType.LLAMA_3,
+                 rng_seed: int = 633, scenario_name: str,
+                 dataset: tuple = ("Salesforce/wikitext", 'wikitext-2-v1'),
                  device='cuda'):
         self.model_path = model_path
         self.llm_type = llm_type
-        self.evaluation_row_count = evaluation_row_count
         self.scenario_name = scenario_name
         self.device = device
-        self.supports_attn_pruning = supports_attn_pruning
         self.batch_size = batch_size
         torch.manual_seed(rng_seed)
 
@@ -54,13 +52,15 @@ class EvaluationScenario:
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
 
-    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1, warmup_repetitions=0):
+    def add_baseline_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1,
+                                warmup_repetitions=0):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, False, warmup_repetitions)
 
     def add_warmup_evaluation(self, capture_energy=False, capture_perplexity=False, repetitions=1):
         return self.__add_non_pruned(capture_energy, capture_perplexity, repetitions, True, warmup_repetitions=0)
 
-    def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool, warmup_repetitions):
+    def __add_non_pruned(self, capture_energy: bool, capture_perplexity: bool, repetitions: int, warmup: bool,
+                         warmup_repetitions):
         chain_of_command: List[Type[Evaluation]] = []
         if capture_perplexity:
             chain_of_command.append(PerplexityEvaluation)
@@ -77,7 +77,7 @@ class EvaluationScenario:
         label_suffix = 'warmup' if warmup else 'baseline'
         label_count = len(self.deferred_warmup) if warmup else len(self.deferred_baseline)
         label_idx = label_count
-        label = f'scenario-{self.scenario_name}-{label_suffix}-{label_idx}'
+        label = f'{self.scenario_name}-{label_suffix}-{label_idx}'
         kwargs['label'] = label
         deferred = lambda: evaluation_type(**kwargs)
         if warmup:
@@ -88,7 +88,7 @@ class EvaluationScenario:
 
     def add_pruned_evaluations(self, *, pruning_strategy, capture_energy=False, capture_perplexity=False,
                                layer_range=None,
-                               evaluation_name, repetitions: int = 1, warmup_repetitions = 0):
+                               evaluation_name, repetitions: int = 1, warmup_repetitions=0):
         if evaluation_name in self.pruned_evaluation_names:
             raise DuplicateEvaluationError(f'Evaluation with name: {evaluation_name} has already been added')
         if layer_range is not None:
@@ -130,41 +130,34 @@ class EvaluationScenario:
         default_kwargs = dict()
         default_kwargs['model_path'] = self.model_path
         default_kwargs['scenario_name'] = self.scenario_name
-        default_kwargs['supports_attn_pruning'] = self.supports_attn_pruning
         default_kwargs['device'] = self.device
         default_kwargs['llm_type'] = self.llm_type
         return default_kwargs
 
     def execute(self):
-        tokens_by_batch = []
         # FIXME this is janky AF
         # This assumes that the dataset, after being filtered, will have more test rows available than specified evaluation_rows
         evaluation_data = load_dataset(*self.dataset)["test"].filter(
             lambda ex: ex["text"] and len(ex["text"].strip()) > 500
         )
-        num_batches = (self.evaluation_row_count + self.batch_size - 1) // self.batch_size
 
-        for batch_index in range(num_batches):
-            start_idx = batch_index * self.batch_size
-            end_idx = min(start_idx + self.batch_size, self.evaluation_row_count)
-            batch = evaluation_data.select(range(start_idx, end_idx))
-            prompts_batch = [example["text"] for example in batch]
-            tokens_batch = self._tokenize(prompts_batch)
-            tokens_by_batch.append(tokens_batch)
+        batch = evaluation_data.select(range(self.batch_size))
+        prompts_batch = [example["text"] for example in batch]
+        tokens_batch = self._tokenize(prompts_batch)
 
         for deferred_evaluation in self.deferred_warmup:
             evaluation = deferred_evaluation()
-            evaluation.evaluate(tokens_by_batch)
+            evaluation.evaluate(tokens_batch)
             del evaluation
         for deferred_evaluation in self.deferred_baseline:
             evaluation = deferred_evaluation()
-            evaluation.evaluate(tokens_by_batch)
+            evaluation.evaluate(tokens_batch)
             del evaluation
         for deferred_evaluation in self.deferred_pruned:
             evaluation = deferred_evaluation()
-            evaluation.evaluate(tokens_by_batch)
+            evaluation.evaluate(tokens_batch)
             del evaluation
-        del tokens_by_batch
+        del tokens_batch
         return self
 
     def _tokenize(self, prompt):

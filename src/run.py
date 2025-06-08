@@ -26,12 +26,6 @@ if __name__ == '__main__':
         help='Path param for the model under test.  Defaults to meta-llama/Meta-Llama-3-8B'
     )
     parser.add_argument(
-        '--eval-rows',
-        type=int,
-        default=1,
-        help='Number of rows of the dataset to evaluate. Defaults to 1.'
-    )
-    parser.add_argument(
         '--layer-range',
         type=str,
         help='Range of layers to evaluate'
@@ -75,8 +69,7 @@ if __name__ == '__main__':
     warmup_repetitions = args.evaluation_warmup_repetitions
 
     scenario = EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                                  evaluation_row_count=args.eval_rows, scenario_name=args.scenario_name,
-                                  supports_attn_pruning=True, batch_size=args.batch_size) \
+                                  scenario_name=args.scenario_name, batch_size=args.batch_size) \
         .add_baseline_evaluation(capture_perplexity=True) \
         .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
                                 evaluation_name="every_other_head_perplexity", layer_range=layer_range) \
