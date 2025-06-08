@@ -3,3 +3,6 @@
 csv
 __pycache__
 generated
+*.out
+.python-version
+results
