@@ -64,8 +64,8 @@ class EnergyLogger(MetricLogger):
     def _get_header() -> Iterable[str]:
         return (
             'label',
-            'layer_idx',
-            'head_idxs',
+            'prune_strategy',
+            'pruning_metadata',
             'average_energy_per_token_mj',
             'average_time_per_token_ms',
         )
@@ -81,8 +81,8 @@ class PerplexityLogger(MetricLogger):
     def _get_header() -> Iterable[str]:
         return (
             'label',
-            'layer_idx',
-            'head_idxs',
+            'prune_strategy',
+            'pruning_metadata',
             'perplexity'
         )
 

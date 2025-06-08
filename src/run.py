@@ -61,14 +61,6 @@ if __name__ == '__main__':
         help='Number of evaluation runs. This differs from repetitions in that a new measurement is made after each '
              'run, each run consisting of a number of repetitions. Defaults to 1.'
     )
-    parser.add_argument(
-        '--capture-perplexity',
-        action='store_true'
-    )
-    parser.add_argument(
-        '--skip-baseline',
-        action='store_true'
-    )
 
     if not torch.cuda.is_available():
         raise Exception("Cuda is currently the only supported platform.")
@@ -80,28 +72,21 @@ if __name__ == '__main__':
     else:
         layer_range = None
 
-    scenario = EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                                  evaluation_row_count=args.eval_rows, scenario_name=args.scenario_name,
-                                  supports_attn_pruning=True, batch_size=args.batch_size)
-
     warmup_repetitions = args.evaluation_warmup_repetitions
 
-    if args.warmup_repetitions:
-        scenario.add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True)
+    scenario = EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                                  evaluation_row_count=args.eval_rows, scenario_name=args.scenario_name,
+                                  supports_attn_pruning=True, batch_size=args.batch_size) \
+        .add_baseline_evaluation(capture_perplexity=True) \
+        .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
+                                evaluation_name="every_other_head_perplexity", layer_range=layer_range) \
+        .add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True)
 
-    if args.capture_perplexity:
-        if not args.skip_baseline:
-            scenario.add_baseline_evaluation(capture_perplexity=True)
-        scenario.add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
-                                        evaluation_name="every_other_head_perplexity", layer_range=layer_range)
-
-    if not args.skip_baseline:
-        for i in range(args.evaluation_runs):
-            scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions,
-                                             warmup_repetitions=warmup_repetitions)
     for i in range(args.evaluation_runs):
-        scenario.add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
-                                        evaluation_name=f"every_other_head_energy_{i}", layer_range=layer_range,
-                                        repetitions=args.repetitions,
-                                        warmup_repetitions=warmup_repetitions)
+        scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions,
+                                         warmup_repetitions=warmup_repetitions) \
+            .add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
+                                    evaluation_name=f"every_other_head_energy_{i}", layer_range=layer_range,
+                                    repetitions=args.repetitions,
+                                    warmup_repetitions=warmup_repetitions)
     scenario.execute()

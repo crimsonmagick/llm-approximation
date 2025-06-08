@@ -57,13 +57,17 @@ if __name__ == '__main__':
 
         for row in reader:
             label = row['label']
-            layer = row['layer_idx']
+            pruning_strategy = row['prune_strategy']
+            metadata = row['pruning_metadata']
             mj_per_token = float(row['average_energy_per_token_mj'])
             if "baseline" in label:
                 baseline_energies.append(mj_per_token)
-            elif layer:
-                layer_energies = pruned_by_layer.setdefault(layer, [])
-                layer_energies.append(mj_per_token)
+            elif pruning_strategy == 'EveryOtherHead' and metadata:
+                split_metadata = metadata.split('|')
+                if len(split_metadata) > 0:
+                    layer = split_metadata[0]
+                    layer_energies = pruned_by_layer.setdefault(layer, [])
+                    layer_energies.append(mj_per_token)
 
     print_metrics('Baseline', baseline_energies, confidence_level)
     for layer, energies in pruned_by_layer.items():

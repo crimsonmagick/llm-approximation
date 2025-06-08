@@ -117,7 +117,7 @@ class EvaluationScenario:
         default_kwargs['warmup_repetitions'] = warmup_repetitions
 
         for layer_idx in range(first_layer, final_layer):
-            label = f'scenario-{self.scenario_name}-evaluation-{evaluation_name}-layer-{layer_idx}'
+            label = f'{self.scenario_name}-{evaluation_name}-layer-{layer_idx}'
             kwargs = default_kwargs.copy()
             kwargs['label'] = label
             if pruning_strategy:
