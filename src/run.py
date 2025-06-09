@@ -3,7 +3,7 @@ import argparse
 import torch
 
 from src.evaluation.pruning import EveryOtherHead
-from src.evaluation.scenario import EvaluationScenario
+from src.evaluation.scenario import EvaluationScenario, PerLayerEvaluationScenario
 from src.models.model_resolution import LLMType
 
 if __name__ == '__main__':
@@ -68,18 +68,17 @@ if __name__ == '__main__':
 
     warmup_repetitions = args.evaluation_warmup_repetitions
 
-    scenario = EvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
-                                  scenario_name=args.scenario_name, batch_size=args.batch_size) \
+    scenario = PerLayerEvaluationScenario(model_path=args.model_path, llm_type=LLMType.LLAMA_3,
+                                          scenario_name=args.scenario_name, batch_size=args.batch_size) \
+        .add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True) \
         .add_baseline_evaluation(capture_perplexity=True) \
-        .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead,
-                                evaluation_name="every_other_head_perplexity", layer_range=layer_range) \
-        .add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True)
+        .add_per_layer_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead, layer_range=layer_range)
 
     for i in range(args.evaluation_runs):
         scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions,
                                          warmup_repetitions=warmup_repetitions) \
-            .add_pruned_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
-                                    evaluation_name=f"every_other_head_energy_{i}", layer_range=layer_range,
-                                    repetitions=args.repetitions,
-                                    warmup_repetitions=warmup_repetitions)
+            .add_per_layer_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
+                                       evaluation_name_suffix=f"-run-{i}", layer_range=layer_range,
+                                       repetitions=args.repetitions,
+                                       warmup_repetitions=warmup_repetitions)
     scenario.execute()

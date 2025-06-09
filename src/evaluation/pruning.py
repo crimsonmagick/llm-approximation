@@ -12,11 +12,14 @@ class PruningStrategy(ABC):
         pass
 
 
-class EveryOtherHead(PruningStrategy):
+class PerLayerStrategy(PruningStrategy, ABC):
 
     def __init__(self, layer_idx: int):
         super().__init__()
         self.layer_idx = layer_idx
+
+
+class EveryOtherHead(PerLayerStrategy):
 
     def __call__(self, model) -> str:
         num_heads = model.config.num_attention_heads
@@ -24,7 +27,3 @@ class EveryOtherHead(PruningStrategy):
         prune_params = {self.layer_idx: head_idxs}
         model.prune_heads(prune_params)
         return f'{self.layer_idx}|{head_idxs}'
-
-
-    def metadata(self):
-        return

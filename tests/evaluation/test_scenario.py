@@ -190,14 +190,14 @@ class EvaluationTests(unittest.TestCase):
                               pruning_strategy=pruning_strategy, expected_repetitions=expected_repetitions,
                               layer_range=layer_range, expected_types=expected_types):
                 evaluation_name = f'test_pruned_evaluation_{i}'
-                pruned_start_idx = len(scenario.deferred_pruned)
+                pruned_start_idx = len(scenario.deferred_evaluations)
                 scenario.add_pruned_evaluations(capture_energy=capture_energy, capture_perplexity=capture_perplexity,
                                                 pruning_strategy=pruning_strategy, repetitions=expected_repetitions,
                                                 layer_range=layer_range, evaluation_name=evaluation_name)
 
                 start_layer, end_layer = layer_range if layer_range else (0, self.num_hidden_layers - 1)
                 expected_length = end_layer - start_layer + 1 if layer_range else self.num_hidden_layers
-                deferred_under_validation = scenario.deferred_pruned[pruned_start_idx:]
+                deferred_under_validation = scenario.deferred_evaluations[pruned_start_idx:]
                 self.assertEqual(expected_length, len(deferred_under_validation))
 
                 for j, layer_idx in enumerate(range(start_layer, end_layer + 1)):
@@ -242,10 +242,10 @@ class EvaluationTests(unittest.TestCase):
             .add_warmup_evaluation(repetitions=warmup_repetitions) \
             .add_baseline_evaluation(capture_perplexity=True) \
             .add_baseline_evaluation(capture_energy=True, repetitions=energy_repetitions) \
-            .add_pruned_evaluations(capture_perplexity=True, pruning_strategy=mock_pruning_strategy,
-                                    evaluation_name=perplexity_evaluation_name) \
-            .add_pruned_evaluations(capture_energy=True, pruning_strategy=mock_pruning_strategy,
-                                    evaluation_name=energy_evaluation_name) \
+            .add_per_layer_evaluations(capture_perplexity=True, pruning_strategy=mock_pruning_strategy,
+                                       evaluation_name=perplexity_evaluation_name) \
+            .add_per_layer_evaluations(capture_energy=True, pruning_strategy=mock_pruning_strategy,
+                                       evaluation_name=energy_evaluation_name) \
             .execute()
 
         self.assertEqual(67, len(StubEvaluation.get_creation_history()))
