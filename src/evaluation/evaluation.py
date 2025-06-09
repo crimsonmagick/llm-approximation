@@ -3,10 +3,9 @@ import logging
 
 import torch
 
-from src.metrics import metrics_manager
 from src.metrics.energy.energy_recording import EnergyRecorder
 from src.metrics.function import objective
-from src.metrics.metrics_manager import EnergyCapture, PerplexityCapture
+from src.metrics.metrics_manager import EnergyCapture, PerplexityCapture, EnergyLogger, PerplexityLogger
 from src.models.model_resolution import resolve_model, LLMType
 
 logger = logging.getLogger(__name__)
@@ -47,6 +46,10 @@ class Evaluation:
 
 class EnergyEvaluation(Evaluation):
 
+    def __init__(self, *, energy_logger: EnergyLogger, **kwargs):
+        self.energy_logger = energy_logger
+        super().__init__(**kwargs)
+
     def evaluate(self, batch):
         attention_mask = batch['attention_mask']
         token_count = attention_mask.sum().item()  # only count unmasked tokens
@@ -81,19 +84,23 @@ class EnergyEvaluation(Evaluation):
             f"average_time_per_token={average_time_per_token_ms:.2f} ms, "
             f"average_energy_per_token_mj={average_energy_per_token_mj :.2f} mj")
 
-        captured_metrics = EnergyCapture(
+        captured_metric = EnergyCapture(
             label=self.label,
             average_energy_per_token_mj=average_energy_per_token_mj,
             average_time_per_token_ms=average_time_per_token_ms,
             pruning_strategy=self.pruning_strategy_name,
             pruning_metadata=self.pruning_metadata
         )
-        metrics_manager.log_energy(captured_metrics, scenario=self.scenario_name)
+        self.energy_logger.log(captured_metric)
 
         return prediction
 
 
 class PerplexityEvaluation(Evaluation):
+
+    def __init__(self, *, perplexity_logger: PerplexityLogger, **kwargs):
+        self.perplexity_logger = perplexity_logger
+        super().__init__(**kwargs)
 
     def evaluate(self, batch):
         input_ids = batch['input_ids']
@@ -105,12 +112,12 @@ class PerplexityEvaluation(Evaluation):
         token_losses = objective.cross_entropy(input_ids, attention_mask,
                                                prediction.logits)
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
-        captured_metrics = PerplexityCapture(
+        captured_metric = PerplexityCapture(
             label=self.label,
             pruning_strategy=self.pruning_strategy_name,
             pruning_metadata=self.pruning_metadata,
             perplexity=perplexity
         )
-        metrics_manager.log_perplexity(captured_metrics, scenario=self.scenario_name)
+        self.perplexity_logger.log(captured_metric)
 
         return prediction

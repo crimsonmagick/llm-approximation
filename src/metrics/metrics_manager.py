@@ -5,10 +5,6 @@ from typing import NamedTuple, Iterable, Tuple
 
 metrics_directory = 'results/scenarios'
 
-_energy_loggers = dict()
-_perplexity_loggers = dict()
-
-
 class EnergyCapture(NamedTuple):
     label: str
     pruning_strategy: str
@@ -85,15 +81,3 @@ class PerplexityLogger(MetricLogger):
             'pruning_metadata',
             'perplexity'
         )
-
-
-def log_energy(captured: EnergyCapture, *, scenario):
-    if _energy_loggers.get(scenario) is None:
-        _energy_loggers[scenario] = EnergyLogger(scenario)
-    _energy_loggers[scenario].log(captured)
-
-
-def log_perplexity(captured: PerplexityCapture, *, scenario):
-    if _perplexity_loggers.get(scenario) is None:
-        _perplexity_loggers[scenario] = PerplexityLogger(scenario)
-    _perplexity_loggers[scenario].log(captured)

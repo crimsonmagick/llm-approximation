@@ -11,6 +11,7 @@ from transformers.utils import PaddingStrategy
 
 from src.evaluation.evaluation import EnergyEvaluation, PerplexityEvaluation, Evaluation
 from src.evaluation.pruning import PerLayerStrategy, PruningStrategy
+from src.metrics.metrics_manager import EnergyLogger, PerplexityLogger
 from src.models.model_resolution import LLMType
 
 logging.basicConfig(level=logging.INFO, force=True)
@@ -48,6 +49,9 @@ class EvaluationScenario:
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        self.energy_logger = EnergyLogger(scenario_name)
+        self.perplexity_logger = PerplexityLogger(scenario_name)
+
     @staticmethod
     def __get_type_name(types: List[Type[Evaluation]]) -> str:
         return "_".join(t.__name__ for t in types)
@@ -64,21 +68,25 @@ class EvaluationScenario:
     def _add_evaluation(self, capture_energy: bool, capture_perplexity: bool, repetitions: int,
                         is_warmup_evaluation: bool,
                         warmup_repetitions, pruning_strategy: PruningStrategy|None, evaluation_name):
-        chain_of_command: List[Type[Evaluation]] = []
-        if capture_perplexity:
-            chain_of_command.append(PerplexityEvaluation)
-        if capture_energy:
-            chain_of_command.append(EnergyEvaluation)
-        if len(chain_of_command) == 0:
-            chain_of_command.append(Evaluation)
-        type_name: str = "_".join(t.__name__ for t in chain_of_command)
-        evaluation_type = type(type_name, tuple(chain_of_command), dict())
 
         kwargs = self.__get_default_kwargs()
         kwargs['repetitions'] = repetitions
         kwargs['warmup_repetitions'] = warmup_repetitions
         kwargs['label'] = f'{self.scenario_name}-{evaluation_name}'
         kwargs['pruning_strategy'] = pruning_strategy
+
+        chain_of_command: List[Type[Evaluation]] = []
+        if capture_perplexity:
+            chain_of_command.append(PerplexityEvaluation)
+            kwargs['perplexity_logger'] = self.perplexity_logger
+        if capture_energy:
+            chain_of_command.append(EnergyEvaluation)
+            kwargs['energy_logger'] = self.energy_logger
+        if len(chain_of_command) == 0:
+            chain_of_command.append(Evaluation)
+        type_name: str = "_".join(t.__name__ for t in chain_of_command)
+        evaluation_type = type(type_name, tuple(chain_of_command), dict())
+
         deferred = partial(evaluation_type, **kwargs)
         if is_warmup_evaluation:
             self.deferred_warmup.append(deferred)
