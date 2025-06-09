@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
         for row in reader:
             label = row['label']
-            pruning_strategy = row['prune_strategy']
+            pruning_strategy = row['pruning_strategy']
             metadata = row['pruning_metadata']
             mj_per_token = float(row['average_energy_per_token_mj'])
             if "baseline" in label:
