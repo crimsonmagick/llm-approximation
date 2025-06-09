@@ -72,12 +72,13 @@ if __name__ == '__main__':
                                           scenario_name=args.scenario_name, batch_size=args.batch_size) \
         .add_warmup_evaluation(repetitions=args.warmup_repetitions, capture_energy=True) \
         .add_baseline_evaluation(capture_perplexity=True) \
-        .add_per_layer_evaluations(capture_perplexity=True, pruning_strategy=EveryOtherHead, layer_range=layer_range)
+        .add_per_layer_evaluations(capture_perplexity=True, pruning_strategy_type=EveryOtherHead,
+                                   layer_range=layer_range)
 
     for i in range(args.evaluation_runs):
         scenario.add_baseline_evaluation(capture_energy=True, repetitions=args.repetitions,
                                          warmup_repetitions=warmup_repetitions) \
-            .add_per_layer_evaluations(capture_energy=True, pruning_strategy=EveryOtherHead,
+            .add_per_layer_evaluations(capture_energy=True, pruning_strategy_type=EveryOtherHead,
                                        evaluation_name_suffix=f"-run-{i}", layer_range=layer_range,
                                        repetitions=args.repetitions,
                                        warmup_repetitions=warmup_repetitions)

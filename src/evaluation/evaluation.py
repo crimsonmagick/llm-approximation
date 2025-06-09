@@ -24,11 +24,9 @@ class Evaluation:
         self.llm_type = llm_type
         self.model_path = model_path
         self.warmup_repetitions = warmup_repetitions
-        self.pruning_metadata = None
         self.model = resolve_model(self.llm_type, self.model_path)
-        self.pruning_strategy = pruning_strategy
-        if pruning_strategy:
-            self.pruning_metadata = pruning_strategy(self.model)
+        self.pruning_strategy_name = type(pruning_strategy).__name__ if pruning_strategy else None
+        self.pruning_metadata = pruning_strategy(self.model) if pruning_strategy else None
 
     def evaluate(self, batch):
         logger.info(
@@ -87,7 +85,7 @@ class EnergyEvaluation(Evaluation):
             label=self.label,
             average_energy_per_token_mj=average_energy_per_token_mj,
             average_time_per_token_ms=average_time_per_token_ms,
-            prune_strategy=type(self.pruning_strategy).__name__ if self.pruning_metadata else None,
+            pruning_strategy=self.pruning_strategy_name,
             pruning_metadata=self.pruning_metadata
         )
         metrics_manager.log_energy(captured_metrics, scenario=self.scenario_name)
@@ -109,7 +107,7 @@ class PerplexityEvaluation(Evaluation):
         perplexity = objective.aggregate_perplexity(token_losses, loss_token_count)
         captured_metrics = PerplexityCapture(
             label=self.label,
-            prune_strategy=type(self.pruning_strategy).__name__ if self.pruning_metadata else None,
+            pruning_strategy=self.pruning_strategy_name,
             pruning_metadata=self.pruning_metadata,
             perplexity=perplexity
         )

@@ -1,7 +1,7 @@
 import csv
 import os
 from abc import ABC, abstractmethod
-from typing import NamedTuple, List, Iterable, Tuple
+from typing import NamedTuple, Iterable, Tuple
 
 metrics_directory = 'results/scenarios'
 
@@ -11,7 +11,7 @@ _perplexity_loggers = dict()
 
 class EnergyCapture(NamedTuple):
     label: str
-    prune_strategy: str
+    pruning_strategy: str
     pruning_metadata: str
     average_energy_per_token_mj: float
     average_time_per_token_ms: float
@@ -19,7 +19,7 @@ class EnergyCapture(NamedTuple):
 
 class PerplexityCapture(NamedTuple):
     label: str
-    prune_strategy: str
+    pruning_strategy: str
     pruning_metadata: str
     perplexity: float
 
@@ -64,7 +64,7 @@ class EnergyLogger(MetricLogger):
     def _get_header() -> Iterable[str]:
         return (
             'label',
-            'prune_strategy',
+            'pruning_strategy',
             'pruning_metadata',
             'average_energy_per_token_mj',
             'average_time_per_token_ms',
@@ -81,7 +81,7 @@ class PerplexityLogger(MetricLogger):
     def _get_header() -> Iterable[str]:
         return (
             'label',
-            'prune_strategy',
+            'pruning_strategy',
             'pruning_metadata',
             'perplexity'
         )

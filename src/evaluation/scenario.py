@@ -129,7 +129,7 @@ class EvaluationScenario:
 
 class PerLayerEvaluationScenario(EvaluationScenario):
 
-    def add_per_layer_evaluations(self, *, pruning_strategy: Type[PerLayerStrategy], capture_energy=False,
+    def add_per_layer_evaluations(self, *, pruning_strategy_type: Type[PerLayerStrategy], capture_energy=False,
                                   capture_perplexity=False, layer_range=None, repetitions: int = 1,
                                   warmup_repetitions=0, evaluation_name_suffix=''):
         if layer_range is not None:
@@ -146,7 +146,8 @@ class PerLayerEvaluationScenario(EvaluationScenario):
 
         for layer_idx in range(first_layer, final_layer):
             evaluation_name = f'pruned-layer-{layer_idx}{evaluation_name_suffix}'
-            self.add_pruned_evaluation(pruning_strategy=pruning_strategy, capture_energy=capture_energy,
+            pruning_strategy_instance = pruning_strategy_type(layer_idx)
+            self.add_pruned_evaluation(pruning_strategy=pruning_strategy_instance, capture_energy=capture_energy,
                                        capture_perplexity=capture_perplexity, repetitions=repetitions,
                                        warmup_repetitions=warmup_repetitions, evaluation_name=evaluation_name)
         return self
