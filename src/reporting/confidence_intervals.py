@@ -3,18 +3,20 @@ import csv
 
 import numpy as np
 import scipy.stats as stats
+import matplotlib.pyplot as plt
 
 
 def print_metrics(metric_name, energies, confidence_level):
-    energies.sort()
+    energies_sorted = energies.copy()
+    energies_sorted.sort()
 
-    energy_max = max(energies)
-    energy_min = min(energies)
-    energy_mean = np.mean(energies)
-    energy_median = np.median(energies)
-    energy_std_dev = np.std(energies, ddof=1)
-    energy_ci = stats.t.interval(confidence_level, df=len(energies) - 1, loc=energy_mean,
-                                 scale=energy_std_dev / np.sqrt(len(energies)))
+    energy_max = max(energies_sorted)
+    energy_min = min(energies_sorted)
+    energy_mean = np.mean(energies_sorted)
+    energy_median = np.median(energies_sorted)
+    energy_std_dev = np.std(energies_sorted, ddof=1)
+    energy_ci = stats.t.interval(confidence_level, df=len(energies_sorted) - 1, loc=energy_mean,
+                                 scale=energy_std_dev / np.sqrt(len(energies_sorted)))
 
     print('--------------------------')
     print(f'--------{metric_name}-----------')
@@ -27,6 +29,43 @@ def print_metrics(metric_name, energies, confidence_level):
           f"range={energy_max - energy_min}\n"
           f"energy_std_dev={energy_std_dev}\n"
           f"energy_confidence_interval=({energy_ci[0]}, {energy_ci[1]})\n")
+
+def analyze_diff(dataset_a, dataset_b):
+    name_a, energies_a = dataset_a
+    name_b, energies_b = dataset_b
+    diff = np.array(energies_a) - np.array(energies_b)
+
+    stats.probplot(energies_a, dist="norm", plot=plt)
+    plt.title(f"{name_a} ProbPlot")
+    plt.show()
+
+    stats.probplot(energies_b, dist="norm", plot=plt)
+    plt.title(f"{name_b} ProbPlot")
+    plt.show()
+
+    plt.title(f"{name_a} vs {name_b}")
+    plt.xlabel("Iteration")
+    plt.ylabel("mJ")
+    plt.plot(energies_a, label=name_a)
+    plt.plot(energies_b, label=name_b)
+    plt.legend()
+    plt.show()
+
+    plt.title(f"{name_a} - {name_b} diff")
+    plt.xlabel("Iteration")
+    plt.ylabel("mJ delta")
+    plt.plot(diff, label="Diff")
+    plt.legend()
+    plt.show()
+
+
+    stats.probplot(diff, dist="norm", plot=plt)
+    plt.title(f"{name_a} - {name_b} ProbPlot")
+    plt.show()
+
+    t_stat, t_p = stats.ttest_rel(energies_a, energies_b)
+    print(f"{name_a} vs {name_b}: t_stat: {t_stat}, t_p: {t_p}")
+
 
 
 if __name__ == '__main__':
@@ -72,3 +111,9 @@ if __name__ == '__main__':
     print_metrics('Baseline', baseline_energies, confidence_level)
     for layer, energies in pruned_by_layer.items():
         print_metrics(f'Layer {layer}', energies, confidence_level)
+    analyze_diff(('Baseline', baseline_energies), ('Layer 1', pruned_by_layer['1']))
+    analyze_diff(('Layer 0', pruned_by_layer['0']), ('Layer 1', pruned_by_layer['1']))
+    analyze_diff(('Layer 1', pruned_by_layer['1']), ('Layer 2', pruned_by_layer['2']))
+
+
+
