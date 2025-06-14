@@ -6,6 +6,10 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 
 
+def get_evaluation_name(evaluation_str):
+    return 'Baseline' if evaluation_str == 'Baseline' else f'Layer {evaluation_str}'
+
+
 def print_metrics(metric_name, energies, confidence_level):
     energies_sorted = energies.copy()
     energies_sorted.sort()
@@ -30,42 +34,21 @@ def print_metrics(metric_name, energies, confidence_level):
           f"energy_std_dev={energy_std_dev}\n"
           f"energy_confidence_interval=({energy_ci[0]}, {energy_ci[1]})\n")
 
-def analyze_diff(dataset_a, dataset_b):
+
+def analyze_diff(dataset_a, dataset_b, confidence_level):
     name_a, energies_a = dataset_a
     name_b, energies_b = dataset_b
+
     diff = np.array(energies_a) - np.array(energies_b)
-
-    stats.probplot(energies_a, dist="norm", plot=plt)
-    plt.title(f"{name_a} ProbPlot")
-    plt.show()
-
-    stats.probplot(energies_b, dist="norm", plot=plt)
-    plt.title(f"{name_b} ProbPlot")
-    plt.show()
-
-    plt.title(f"{name_a} vs {name_b}")
-    plt.xlabel("Iteration")
-    plt.ylabel("mJ")
-    plt.plot(energies_a, label=name_a)
-    plt.plot(energies_b, label=name_b)
-    plt.legend()
-    plt.show()
-
-    plt.title(f"{name_a} - {name_b} diff")
-    plt.xlabel("Iteration")
-    plt.ylabel("mJ delta")
-    plt.plot(diff, label="Diff")
-    plt.legend()
-    plt.show()
-
-
-    stats.probplot(diff, dist="norm", plot=plt)
-    plt.title(f"{name_a} - {name_b} ProbPlot")
-    plt.show()
+    skew = stats.skew(diff)
 
     t_stat, t_p = stats.ttest_rel(energies_a, energies_b)
-    print(f"{name_a} vs {name_b}: t_stat: {t_stat}, t_p: {t_p}")
-
+    w_stat, w_p = stats.wilcoxon(energies_a, energies_b)
+    shap_w, shap_p = stats.shapiro(diff)
+    alpha = round(1 - confidence_level, 2)
+    if w_p < alpha and t_p < alpha:
+        # print(f"{name_a} vs {name_b}: skew: {skew}, , shap_t: {shap_w}, shap_p: {shap_p}, t_stat: {t_stat}, t_p: {t_p}, w_stat: {w_stat}, w_p: {w_p}")
+        print(f"{name_a} vs {name_b}: t_stat: {t_stat}, t_p: {t_p}, w_stat: {w_stat}, w_p: {w_p}")
 
 
 if __name__ == '__main__':
@@ -104,16 +87,18 @@ if __name__ == '__main__':
             elif pruning_strategy == 'EveryOtherHead' and metadata:
                 split_metadata = metadata.split('|')
                 if len(split_metadata) > 0:
-                    layer = split_metadata[0]
-                    layer_energies = pruned_by_layer.setdefault(layer, [])
+                    layer_a = split_metadata[0]
+                    layer_energies = pruned_by_layer.setdefault(layer_a, [])
                     layer_energies.append(mj_per_token)
 
-    print_metrics('Baseline', baseline_energies, confidence_level)
-    for layer, energies in pruned_by_layer.items():
-        print_metrics(f'Layer {layer}', energies, confidence_level)
-    analyze_diff(('Baseline', baseline_energies), ('Layer 1', pruned_by_layer['1']))
-    analyze_diff(('Layer 0', pruned_by_layer['0']), ('Layer 1', pruned_by_layer['1']))
-    analyze_diff(('Layer 1', pruned_by_layer['1']), ('Layer 2', pruned_by_layer['2']))
+    by_evaluation_name = pruned_by_layer.copy()
+    by_evaluation_name['Baseline'] = baseline_energies
+    # analyze_diff(('Baseline', baseline_energies), ('Layer 0', pruned_by_layer['0']))
 
+    for layer_a, energies_a in by_evaluation_name.items():
+        evaluation_name_a = get_evaluation_name(layer_a)
+        print_metrics(evaluation_name_a, energies_a, confidence_level)
 
-
+        for layer_b, energies_b in by_evaluation_name.items():
+            evaluation_name_b = get_evaluation_name(layer_b)
+            analyze_diff((evaluation_name_a, energies_a), (evaluation_name_b, energies_b), confidence_level)
