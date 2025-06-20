@@ -3,55 +3,61 @@ import csv
 
 import numpy as np
 import scipy.stats as stats
-import matplotlib.pyplot as plt
 
 
 def get_evaluation_name(evaluation_str):
     return 'Baseline' if evaluation_str == 'Baseline' else f'Layer {evaluation_str}'
 
 
-def print_metrics(metric_name, energies, confidence_level):
-    energies_sorted = energies.copy()
-    energies_sorted.sort()
+def print_metrics(metric_name, metrics, confidence_level):
+    metrics_sorted = metrics.copy()
+    metrics_sorted.sort()
 
-    energy_max = max(energies_sorted)
-    energy_min = min(energies_sorted)
-    energy_mean = np.mean(energies_sorted)
-    energy_median = np.median(energies_sorted)
-    energy_std_dev = np.std(energies_sorted, ddof=1)
-    energy_ci = stats.t.interval(confidence_level, df=len(energies_sorted) - 1, loc=energy_mean,
-                                 scale=energy_std_dev / np.sqrt(len(energies_sorted)))
+    metric_max = max(metrics_sorted)
+    metric_min = min(metrics_sorted)
+    metric_mean = np.mean(metrics_sorted)
+    metric_median = np.median(metrics_sorted)
+    metric_std_dev = np.std(metrics_sorted, ddof=1)
+    metric_ci = stats.t.interval(confidence_level, df=len(metrics_sorted) - 1, loc=metric_mean,
+                                 scale=metric_std_dev / np.sqrt(len(metrics_sorted)))
 
     print('--------------------------')
     print(f'--------{metric_name}-----------')
     print('--------------------------')
-    print(f'energies={energies}')
-    print(f"energy_mean={energy_mean}\n"
-          f"energy_median={energy_median}\n"
-          f"energy_min={energy_min}\n"
-          f"energy_max={energy_max}\n"
-          f"range={energy_max - energy_min}\n"
-          f"energy_std_dev={energy_std_dev}\n"
-          f"energy_confidence_interval=({energy_ci[0]}, {energy_ci[1]})\n")
+    print(f"mean={metric_mean}\n"
+          f"median={metric_median}\n"
+          f"min={metric_min}\n"
+          f"max={metric_max}\n"
+          f"range={metric_max - metric_min}\n"
+          f"std_dev={metric_std_dev}\n"
+          f"confidence_interval=({metric_ci[0]}, {metric_ci[1]})\n")
 
 
-def analyze_diff(dataset_a, dataset_b, confidence_level):
-    name_a, energies_a = dataset_a
-    name_b, energies_b = dataset_b
-
-    diff = np.array(energies_a) - np.array(energies_b)
+def analyze_diff(metrics_a, metrics_b):
+    diff = np.array(metrics_a) - np.array(metrics_b)
     skew = stats.skew(diff)
-
-    t_stat, t_p = stats.ttest_rel(energies_a, energies_b)
-    w_stat, w_p = stats.wilcoxon(energies_a, energies_b)
     shap_w, shap_p = stats.shapiro(diff)
+
+    t_stat, t_p = stats.ttest_rel(metrics_a, metrics_b)
+    w_stat, w_p = stats.wilcoxon(metrics_a, metrics_b)
+
+    return t_stat, t_p, w_stat, w_p, skew, shap_w, shap_p
+
+def compare_layers(metric_description, metrics_by_layer, confidence_level):
     alpha = round(1 - confidence_level, 2)
-    if w_p < alpha and t_p < alpha:
-        # print(f"{name_a} vs {name_b}: skew: {skew}, , shap_t: {shap_w}, shap_p: {shap_p}, t_stat: {t_stat}, t_p: {t_p}, w_stat: {w_stat}, w_p: {w_p}")
-        print(f"{name_a} vs {name_b}: t_stat: {t_stat}, t_p: {t_p}, w_stat: {w_stat}, w_p: {w_p}")
+    for layer_idx, energies_a in metrics_by_layer.items():
+        evaluation_name_a = metric_description + ' ' +  get_evaluation_name(layer_idx)
+        print_metrics(evaluation_name_a, energies_a, confidence_level)
+
+        for layer_b, energies_b in metrics_by_layer.items():
+            evaluation_name_b = get_evaluation_name(layer_b)
+            t_stat, t_p, w_stat, w_p, _, _, _ = analyze_diff(energies_a, energies_b)
+            if w_p < alpha and t_p < alpha:
+                print(
+                    f"{metric_description} - {evaluation_name_a} vs {evaluation_name_b}: t_stat: {t_stat}, t_p: {t_p}, w_stat: {w_stat}, w_p: {w_p}")
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description="Calculates baseline metrics.")
     parser.add_argument(
         '--input-path',
@@ -70,11 +76,12 @@ if __name__ == '__main__':
     confidence_level = args.confidence_level
 
     baseline_energies = []
-    pruned_by_layer = dict()
+    pruned_by_layer_energies = dict()
+    baseline_time = []
+    pruned_by_layer_time = dict()
 
     # # Read and process the CSV file
     with open(input_path, mode='r') as file:
-        measurements_per_layer = 20
         reader = csv.DictReader(file)
 
         for row in reader:
@@ -82,23 +89,29 @@ if __name__ == '__main__':
             pruning_strategy = row['pruning_strategy']
             metadata = row['pruning_metadata']
             mj_per_token = float(row['average_energy_per_token_mj'])
+            time_per_token = float(row['average_time_per_token_ms'])
             if "baseline" in label:
                 baseline_energies.append(mj_per_token)
+                baseline_time.append(time_per_token)
             elif pruning_strategy == 'EveryOtherHead' and metadata:
                 split_metadata = metadata.split('|')
                 if len(split_metadata) > 0:
-                    layer_a = split_metadata[0]
-                    layer_energies = pruned_by_layer.setdefault(layer_a, [])
+                    layer_idx = split_metadata[0]
+                    layer_energies = pruned_by_layer_energies.setdefault(layer_idx, [])
                     layer_energies.append(mj_per_token)
+                    layer_times = pruned_by_layer_time.setdefault(layer_idx, [])
+                    layer_times.append(time_per_token)
 
-    by_evaluation_name = pruned_by_layer.copy()
-    by_evaluation_name['Baseline'] = baseline_energies
-    # analyze_diff(('Baseline', baseline_energies), ('Layer 0', pruned_by_layer['0']))
+    by_evaluation_name_energies = pruned_by_layer_energies.copy()
+    by_evaluation_name_energies['Baseline'] = baseline_energies
+    by_evaluation_name_times= pruned_by_layer_time.copy()
+    by_evaluation_name_times['Baseline'] = baseline_time
 
-    for layer_a, energies_a in by_evaluation_name.items():
-        evaluation_name_a = get_evaluation_name(layer_a)
-        print_metrics(evaluation_name_a, energies_a, confidence_level)
+    compare_layers("Energy", by_evaluation_name_energies, confidence_level)
+    compare_layers("Time", by_evaluation_name_times, confidence_level)
 
-        for layer_b, energies_b in by_evaluation_name.items():
-            evaluation_name_b = get_evaluation_name(layer_b)
-            analyze_diff((evaluation_name_a, energies_a), (evaluation_name_b, energies_b), confidence_level)
+
+
+
+if __name__ == '__main__':
+    main()
