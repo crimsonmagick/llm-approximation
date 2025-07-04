@@ -1,6 +1,7 @@
 .idea
 .venv
 csv
+reports
 __pycache__
 generated
 *.out
