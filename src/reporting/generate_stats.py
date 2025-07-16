@@ -33,6 +33,7 @@ class ModelStats(NamedTuple):
     norm_range: float
     std_dev: float
     cv: str  # coefficient of variation
+    confidence_level: float
     ci: str  # confidence interval
 
 
@@ -70,8 +71,8 @@ class StatGenerator:
                                          scale=metric_std_dev / np.sqrt(len(metrics_sorted)))
             model_stats = ModelStats(model=model, max=metric_max, min=metric_min, range=metric_range, mean=metric_mean,
                                      norm_range=metric_norm_range, median=metric_median, std_dev=metric_std_dev,
-                                     cv=metric_cv,
-                                     ci=metric_ci)
+                                     cv=metric_cv, confidence_level=self.confidence_level,
+                                     ci=f'{metric_ci[0]}-{metric_ci[1]}')
             csv_writer.writerow(model_stats)
         file.close()
         return self
