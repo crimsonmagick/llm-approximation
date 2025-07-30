@@ -10,6 +10,7 @@ from src.models.llama.modeling_pruned_llama import PrunedLlamaForCausalLM
 class LLMType(Enum):
     LLAMA_2 = 'llama2'
     LLAMA_3 = 'llama3'
+    QWEN_2 = 'qwen2'
     BERT = 'BERT'
 
 
