@@ -58,7 +58,7 @@ class PrunedLlamaModel(LlamaModel):
             llama_attention.prune_heads(head_idxs)
     
     def prune_layers(self, layers):
-        for layer_idx in layers:
+        for layer_idx in sorted(layers, reverse=True):
             self.layers.pop(layer_idx)
 
 
