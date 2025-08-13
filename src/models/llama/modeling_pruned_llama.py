@@ -94,12 +94,12 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
             self.build_pruned_kv_counts(keep_heads, self.num_key_value_groups), dtype=torch.long,
             device=self.pruned_kv_counts.device)
         self.num_key_value_groups = 0 if self.pruned_kv_counts.numel() == 0 else max(self.pruned_kv_counts).item()
-        self.prune_linear(self.q_proj, keep_idxs, 0)
-        self.prune_linear(self.o_proj, keep_idxs, 1)
+        self.q_proj = self.prune_linear(self.q_proj, keep_idxs, 0)
+        self.o_proj = self.prune_linear(self.o_proj, keep_idxs, 1)
         self.num_heads = self.num_heads - len(self.pruned_heads)
         
-        self.prune_linear(self.k_proj, keep_kv_idxs, 0)
-        self.prune_linear(self.v_proj, keep_kv_idxs, 0)
+        self.k_proj = self.prune_linear(self.k_proj, keep_kv_idxs, 0)
+        self.v_proj = self.prune_linear(self.v_proj, keep_kv_idxs, 0)
         self.num_key_value_heads = len(keep_kv_heads)
     
     @staticmethod
@@ -117,6 +117,7 @@ class PrunedLlamaSdpaAttention(LlamaSdpaAttention):
         # TODO add support for pruning biases (not needed with Llama 3 OOTB)
         pruned_weights = torch.index_select(to_prune.weight, dim, keep_idxs)
         to_prune.weight.data = pruned_weights
+        return to_prune
     
     @staticmethod
     def get_keep_indices(keep_hds, head_dim):
