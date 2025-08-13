@@ -11,10 +11,11 @@ QWEN_LLM_PATH = '/home/welby/models/Qwen2-7B'
 DEVICE = 'cuda'
 
 if __name__ == '__main__':
-    # model =  PrunedLlamaForCausalLM.from_pretrained(LLAMA_LLM_PATH, torch_dtype=bfloat16, device_map='cuda')
-    model = PrunedQwen2ForCausalLM.from_pretrained(QWEN_LLM_PATH, torch_dtype=bfloat16, device_map='cuda')
-    # for i in range(0, 2):
-    #     model.prune_heads({i: list(range(0, 32, 2))})
+    model =  PrunedLlamaForCausalLM.from_pretrained(LLAMA_LLM_PATH, torch_dtype=bfloat16, device_map='cuda')
+    # model = PrunedQwen2ForCausalLM.from_pretrained(QWEN_LLM_PATH, torch_dtype=bfloat16, device_map='cuda')
+    for i in range(0, 2):
+        model.prune_heads({i: list(range(0, 32, 1))})
+    # print(model)
     prompt = 'Salutations, I'
     tokenizer = AutoTokenizer.from_pretrained(LLAMA_LLM_PATH, use_fast=True, device=DEVICE)
     tokenizer.pad_token = tokenizer.eos_token
@@ -31,3 +32,4 @@ if __name__ == '__main__':
     )
     decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
     print(decoded)
+    # print(decoded)
